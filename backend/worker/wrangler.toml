@@ -1,0 +1,20 @@
+# SteinWall backend: one Worker plus a D1 database. Deploy from this folder with `npx wrangler deploy`.
+# Secrets are set in the Cloudflare dashboard (Worker -> Settings -> Variables and Secrets) or with
+# `npx wrangler secret put <NAME>`: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, LICENSE_PRIVATE_JWK.
+name = "steinwall-api"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "steinwall"
+database_id = "70b930dc-f7ff-4bbd-aab1-367ef815b72e"
+
+# Not secret: Stripe price ids (test mode) and the website the buyer returns to.
+# Switch to the live price ids and the own domain at launch; set SITE_ORIGIN to that domain too.
+[vars]
+SITE_URL = "https://steinwall.unilevelup.workers.dev"
+STRIPE_PRICE_MONTHLY = "price_1UT6ZC6zEkNTIBlA0GvV7bN0"
+STRIPE_PRICE_YEARLY = "price_1UT6ZE6zEkNTIBlANZKmoPyt"
+STRIPE_PRICE_FOUNDER = "price_1UT6ZG6zEkNTIBlAN99S4SVh"

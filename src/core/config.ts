@@ -39,7 +39,7 @@ export interface Config {
     /** Identical successful calls without any file change before a hint. */
     repeatHintAfter: number;
   };
-  /** Backend base URL (Supabase functions), e.g. https://<project>.supabase.co/functions/v1. Empty: offline only. */
+  /** Backend base URL (the Cloudflare Worker in backend/worker). Empty: offline only. */
   license: { apiUrl: string };
   /** Opt-in only: one number per day (estimated savings) plus a random install id. */
   telemetry: { enabled: boolean; asked: boolean };
@@ -89,7 +89,7 @@ export const DEFAULT_CONFIG: Config = {
   plan: "auto",
   budget: { dailyUsd: 25, monthlyUsd: 300, warnAt: 0.8, enforceOnSubscription: false },
   loop: { enabled: true, hintAfter: 3, escalateAfter: 5, notifyUserAfter: 8, repeatHintAfter: 6 },
-  license: { apiUrl: "https://lidwpjnxoazsdicvpvbs.supabase.co/functions/v1" },
+  license: { apiUrl: "https://steinwall-api.unilevelup.workers.dev" },
   telemetry: { enabled: false, asked: false },
   pro: { routing: true, contextAdvisor: true, contextWarnTokens: 150_000, outputTrim: true, outputTrimChars: 30_000, costCoach: false },
   scanner: { enabled: true, trusted: [], includeDesktopPlugins: true },

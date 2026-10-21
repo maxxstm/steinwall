@@ -1,4 +1,4 @@
-// License tokens, shared by the Edge Functions (Deno) and tested with Node (Web Crypto in both).
+// License tokens, shared by the Worker and tested with Node (Web Crypto in both).
 // Format: "SW1." + base64url(JSON payload) + "." + base64url(Ed25519 signature over the first two parts).
 // The plugin verifies offline with the matching public key (src/core/license-key.ts).
 

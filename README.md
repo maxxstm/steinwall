@@ -160,7 +160,7 @@ skills/steinwall/            skill for both agents: status, report, scan
 agents/scout.md              Pro routing subagent (Haiku)
 src/core/license.ts, pro.ts, rules.ts, dashboard.ts, card.ts   Pro and licensing
 src/mcp/server.ts            MCP server (`steinwall mcp`)
-backend/supabase/            Edge Functions (checkout, stripe-webhook, license, license-refresh, telemetry) + SQL
+backend/worker/              Cloudflare Worker (checkout, stripe-webhook, license, license-refresh, telemetry) + D1 schema
 site/                        website (landing, pricing, license page, guides, legal placeholders, llms.txt)
 docs/LAUNCH.md               launch checklist: everything that needs your accounts or decisions
 dist/                        compiled output, committed (plugins install without a build step)

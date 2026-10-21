@@ -2,7 +2,7 @@
 //  - The public key goes into src/core/license-key.ts (shipped with the plugin).
 //  - The private key is written as a JWK to the path given as the first argument (default:
 //    ~/steinwall-license-private.jwk.json). It must never be committed. Set it as the backend
-//    secret LICENSE_PRIVATE_JWK, e.g. `supabase secrets set LICENSE_PRIVATE_JWK="$(cat <file>)"`.
+//    secret LICENSE_PRIVATE_JWK of the Worker (Cloudflare dashboard or `npx wrangler secret put`).
 // Refuses to overwrite an existing public key, so a running product does not lose its keys by accident.
 import { generateKeyPairSync } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";

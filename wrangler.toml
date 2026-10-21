@@ -1,0 +1,9 @@
+# Website: the static files in site/ served by Cloudflare (Workers static assets).
+# Deploy from the repository root with `npx wrangler deploy`. The backend has its own config in backend/worker/.
+name = "steinwall"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[assets]
+directory = "./site"
+not_found_handling = "404-page"

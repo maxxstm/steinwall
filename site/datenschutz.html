@@ -17,7 +17,7 @@
 <ul>
 <li>Separate Opt-in-Abfrage beim ersten Start, nicht vorausgewählt, jederzeit widerrufbar (<code>/steinwall:telemetry off</code>).</li>
 <li>Übertragen werden pro Tag: zufällige Installations-ID (UUID, nicht vom Gerät abgeleitet), Datum und geschätzte Ersparnis in USD.</li>
-<li>Empfänger: Backend auf Supabase (Edge Functions, Postgres). Region und Auftragsverarbeitungsvertrag festlegen.</li>
+<li>Empfänger: Backend auf Cloudflare (Workers, D1-Datenbank in Westeuropa). Auftragsverarbeitungsvertrag (Cloudflare DPA) prüfen.</li>
 <li>IP-Adressen werden von der Anwendung nicht gespeichert. Ob der Hoster sie protokolliert, ist zu prüfen und anzugeben.</li>
 </ul>
 <h3>Pro-Kauf und Lizenz</h3>

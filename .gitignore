@@ -9,3 +9,4 @@ node_modules/
 # Private planning documents: never publish.
 steinguard-briefing.md
 docs/LAUNCH.md
+.wrangler/

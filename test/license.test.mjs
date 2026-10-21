@@ -8,8 +8,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 process.env.STEINWALL_HOME = mkdtempSync(join(tmpdir(), "sw-license-"));
-const backend = await import("../backend/supabase/functions/_shared/license.ts");
-const { verifyStripeSignature, formEncode } = await import("../backend/supabase/functions/_shared/stripe.ts");
+const backend = await import("../backend/worker/src/license.ts");
+const { verifyStripeSignature, formEncode } = await import("../backend/worker/src/stripe.ts");
 const lic = await import("../dist/core/license.js");
 
 const DAY = 86_400_000;
