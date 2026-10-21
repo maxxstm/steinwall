@@ -5,6 +5,7 @@
 //   POST /license-refresh  { token } -> { token } with the current period, or 410 when the license has ended
 //   GET  /telemetry        -> { totalUsd, installs } for the public counter
 //   POST /telemetry        { installId, day, savedUsd } opt-in, one number per install and day
+//   GET  /health           { ok, problems } setup check: missing or swapped secrets, never their values
 import { importPrivateKey, licenseExpiry, type LicensePayload, newReferralCode, publicKeyFromPrivate, signLicense, verifyLicense } from "./license.ts";
 import { stripe, verifyStripeSignature } from "./stripe.ts";
 
@@ -66,7 +67,43 @@ interface Subscription {
 function secret(env: Env, name: keyof Env): string {
   const v = env[name];
   if (typeof v !== "string" || !v) throw new Error(`missing secret ${name}`);
+  const problem = secretProblem(name, v);
+  if (problem) throw new Error(problem);
   return v;
+}
+
+/**
+ * Catches the usual setup mistakes (swapped Stripe values, a publishable key, a broken JWK paste)
+ * with a message that names the fix. Only prefixes are reported, never values.
+ */
+export function secretProblem(name: keyof Env, value: string | undefined): string | null {
+  if (!value) return `${name} is not set`;
+  const prefix = /^[a-z]{2,5}_/.exec(value)?.[0] ?? "something else";
+  if (name === "STRIPE_SECRET_KEY" && !/^(sk|rk)_/.test(value)) {
+    const hint = value.startsWith("whsec_") ? " (this is the webhook signing secret)" : value.startsWith("pk_") ? " (this is the publishable key)" : "";
+    return `STRIPE_SECRET_KEY must start with sk_ or rk_, but starts with ${prefix}${hint}`;
+  }
+  if (name === "STRIPE_WEBHOOK_SECRET" && !value.startsWith("whsec_")) {
+    const hint = /^(sk|rk)_/.test(value) ? " (this is the Stripe secret key)" : "";
+    return `STRIPE_WEBHOOK_SECRET must start with whsec_, but starts with ${prefix}${hint}`;
+  }
+  if (name === "LICENSE_PRIVATE_JWK") {
+    try {
+      const jwk = JSON.parse(value) as JsonWebKey;
+      if (jwk.kty !== "OKP" || jwk.crv !== "Ed25519" || !jwk.d) return "LICENSE_PRIVATE_JWK is not an Ed25519 private key (paste the whole file)";
+    } catch {
+      return "LICENSE_PRIVATE_JWK is not valid JSON (paste the whole file)";
+    }
+  }
+  return null;
+}
+
+const REQUIRED: (keyof Env)[] = ["SITE_URL", "STRIPE_PRICE_MONTHLY", "STRIPE_PRICE_YEARLY", "STRIPE_PRICE_FOUNDER", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "LICENSE_PRIVATE_JWK"];
+
+/** Setup check without revealing anything: which settings are missing or look wrong. */
+async function health(_req: Request, env: Env): Promise<Response> {
+  const problems = REQUIRED.map((name) => secretProblem(name, env[name] as string | undefined)).filter((p): p is string => p !== null);
+  return json(env, { ok: problems.length === 0, problems });
 }
 
 function cors(env: Env): Record<string, string> {
@@ -225,6 +262,7 @@ const ROUTES: Record<string, (req: Request, env: Env) => Promise<Response>> = {
   "/license": license,
   "/license-refresh": licenseRefresh,
   "/telemetry": telemetry,
+  "/health": health,
 };
 
 export async function handle(req: Request, env: Env): Promise<Response> {

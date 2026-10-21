@@ -149,6 +149,22 @@ test("telemetry stores one number per install and day and sums them for the coun
   assert.deepEqual(await (await handle(req("/telemetry"), env)).json(), { totalUsd: 3.5, installs: 2 });
 });
 
+test("setup check names swapped or broken secrets without revealing them", async () => {
+  const env = makeEnv();
+  assert.deepEqual(await (await handle(req("/health"), env)).json(), { ok: true, problems: [] });
+  const swapped = { ...env, STRIPE_SECRET_KEY: "whsec_abc123", STRIPE_WEBHOOK_SECRET: "sk_test_abc123", LICENSE_PRIVATE_JWK: "{\"kty\":" };
+  const { ok, problems } = await (await handle(req("/health"), swapped)).json();
+  assert.equal(ok, false);
+  assert.match(problems[0], /STRIPE_SECRET_KEY must start with sk_ or rk_, but starts with whsec_ \(this is the webhook signing secret\)/);
+  assert.match(problems[1], /STRIPE_WEBHOOK_SECRET must start with whsec_, but starts with sk_ \(this is the Stripe secret key\)/);
+  assert.match(problems[2], /LICENSE_PRIVATE_JWK is not valid JSON/);
+  assert.ok(!JSON.stringify(problems).includes("abc123"), "values never appear");
+  assert.match((await handle(req("/health"), { ...env, STRIPE_SECRET_KEY: "pk_test_x" })).headers.get("content-type"), /json/);
+  assert.deepEqual((await (await handle(req("/health"), { ...env, STRIPE_PRICE_YEARLY: "" })).json()).problems, ["STRIPE_PRICE_YEARLY is not set"]);
+  const res = await handle(post("/checkout", { plan: "monthly" }), swapped);
+  assert.equal(res.status, 500, "checkout refuses to call Stripe with a swapped key");
+});
+
 test("routing, CORS and errors", async () => {
   const env = makeEnv();
   assert.equal((await handle(req("/nope"), env)).status, 404);
