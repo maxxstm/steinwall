@@ -1,0 +1,115 @@
+/**
+ * Pro licensing. A license is a signed token issued by the SteinWall backend after a Stripe
+ * purchase: `SW1.<base64url payload>.<base64url Ed25519 signature>`. It is verified offline against
+ * the public key below, so Pro works without network. Every few days the plugin refreshes the token
+ * online (renewals, referral months, cancellations); after expiry a short grace period applies.
+ * New installs get a 5-day Pro trial, counted locally from the first start.
+ */
+import { createPublicKey, randomUUID, verify } from "node:crypto";
+import { join } from "node:path";
+import { readJson, writeJson } from "./fsutil.js";
+import { stateDir } from "./paths.js";
+import { LICENSE_PUBLIC_KEY_SPKI } from "./license-key.js";
+export const TRIAL_DAYS = 5;
+const DAY = 24 * 3600 * 1000;
+/** Pro keeps working this long past the paid period if the refresh cannot reach the server. */
+const GRACE_DAYS = 7;
+export const REFRESH_EVERY_DAYS = 3;
+const licenseFile = () => join(stateDir(), "license.json");
+const installFile = () => join(stateDir(), "install.json");
+/** Random install id and first-start time (for the trial). Never derived from the machine. */
+export function installInfo(now = Date.now()) {
+    const existing = readJson(installFile(), null);
+    if (existing?.installId)
+        return existing;
+    const fresh = { installId: randomUUID(), installedAt: now };
+    writeJson(installFile(), fresh);
+    return fresh;
+}
+const b64url = (s) => Buffer.from(s.replace(/-/g, "+").replace(/_/g, "/"), "base64");
+/** Payload of a valid signature, or null. Expiry is checked separately. */
+export function verifyToken(token, publicKeySpkiB64 = LICENSE_PUBLIC_KEY_SPKI) {
+    if (!publicKeySpkiB64)
+        return null;
+    const parts = token.trim().split(".");
+    if (parts.length !== 3 || parts[0] !== "SW1")
+        return null;
+    try {
+        const key = createPublicKey({ key: Buffer.from(publicKeySpkiB64, "base64"), format: "der", type: "spki" });
+        const ok = verify(null, Buffer.from(`${parts[0]}.${parts[1]}`), key, b64url(parts[2]));
+        if (!ok)
+            return null;
+        const payload = JSON.parse(b64url(parts[1]).toString("utf8"));
+        return payload.v === 1 && payload.plan === "pro" && typeof payload.exp === "string" ? payload : null;
+    }
+    catch {
+        return null;
+    }
+}
+export function proStatus(now = Date.now(), publicKey = LICENSE_PUBLIC_KEY_SPKI) {
+    const install = installInfo(now);
+    const trialDaysLeft = Math.max(0, Math.ceil((install.installedAt + TRIAL_DAYS * DAY - now) / DAY));
+    const token = readJson(licenseFile(), {}).token;
+    const license = token ? verifyToken(token, publicKey) : null;
+    if (license) {
+        const left = (new Date(license.exp).getTime() - now) / DAY;
+        if (left >= 0)
+            return { pro: true, reason: "license", trialDaysLeft, license, licenseDaysLeft: Math.ceil(left) };
+        if (left >= -GRACE_DAYS)
+            return { pro: true, reason: "grace", trialDaysLeft, license, licenseDaysLeft: Math.floor(left) };
+    }
+    if (trialDaysLeft > 0)
+        return { pro: true, reason: "trial", trialDaysLeft, ...(license ? { license } : {}) };
+    return { pro: false, reason: "none", trialDaysLeft: 0, ...(license ? { license } : {}) };
+}
+export function isPro(now = Date.now()) {
+    return proStatus(now).pro;
+}
+/** Store a license token after checking its signature. Returns the payload or throws. */
+export function activateLicense(token, publicKey = LICENSE_PUBLIC_KEY_SPKI) {
+    const payload = verifyToken(token, publicKey);
+    if (!payload)
+        throw new Error(publicKey ? "invalid license key" : "this build has no license public key yet");
+    writeJson(licenseFile(), { token: token.trim(), refreshedAt: Date.now() });
+    return payload;
+}
+export function deactivateLicense() {
+    writeJson(licenseFile(), {});
+}
+export function refreshDue(now = Date.now()) {
+    const state = readJson(licenseFile(), {});
+    return !!state.token && now - (state.refreshedAt ?? 0) > REFRESH_EVERY_DAYS * DAY;
+}
+/**
+ * Ask the backend for a current token (renewal, referral months, cancellation). Sends only the
+ * token itself. Network failures keep the existing token; the grace period covers offline use.
+ */
+export async function refreshLicense(apiUrl, fetchImpl = fetch, publicKey = LICENSE_PUBLIC_KEY_SPKI) {
+    const state = readJson(licenseFile(), {});
+    if (!state.token || !apiUrl)
+        return "unchanged";
+    try {
+        const res = await fetchImpl(`${apiUrl.replace(/\/$/, "")}/license-refresh`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ token: state.token }),
+            signal: AbortSignal.timeout(5000),
+        });
+        if (res.status === 410) {
+            writeJson(licenseFile(), {});
+            return "revoked";
+        }
+        if (!res.ok)
+            return "offline";
+        const body = (await res.json());
+        if (body.token && verifyToken(body.token, publicKey)) {
+            const changed = body.token !== state.token;
+            writeJson(licenseFile(), { token: body.token, refreshedAt: Date.now() });
+            return changed ? "updated" : "unchanged";
+        }
+        return "offline";
+    }
+    catch {
+        return "offline";
+    }
+}

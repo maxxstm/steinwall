@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SteinWall – cost brake and guardrails for coding agents</title>
+<meta name="description" content="SteinWall stops runaway costs, blocks risky actions, rescues stuck loops and scans skills and MCP servers for Claude Code and Codex. Runs locally. Spend less. Break nothing.">
+<link rel="stylesheet" href="style.css">
+<script src="config.js"></script>
+</head>
+<body>
+<header><a href="./">SteinWall</a><nav><a href="#features">Features</a><a href="#install">Install</a><a href="#pricing">Pricing</a></nav></header>
+<main>
+  <h1>Spend less. Break nothing.</h1>
+  <p class="lead">SteinWall runs next to Claude Code and Codex on your machine. It stops runaway costs, blocks dangerous actions before they happen, gets stuck agents unstuck and checks new skills and MCP servers before you install them.</p>
+  <div class="counter" id="counter" hidden>Users have saved <strong id="counter-usd">≈ $0</strong> so far</div>
+  <p><a class="button" href="#install">Install in one command</a></p>
+
+  <h2 id="features">What it does</h2>
+  <div class="grid">
+    <div class="card"><h3>Cost brake</h3><p>Daily and monthly budget. A warning at 80 %, a hard stop at the limit. Lift it for today with one command.</p></div>
+    <div class="card"><h3>Action guard</h3><p>Asks or blocks before recursive deletes, force pushes, reading .env files or SSH keys, and piping downloads into a shell.</p></div>
+    <div class="card"><h3>Loop rescue</h3><p>When the same error comes back three times, the agent is told to change course. Repeating the same command blindly gets blocked.</p></div>
+    <div class="card"><h3>Extension scanner</h3><p>Checks skills, plugins and MCP servers for prompt injection, hidden shell commands and data exfiltration before you install them.</p></div>
+    <div class="card"><h3>Limit handoff</h3><p>Before the 5-hour or weekly limit runs out, the agent writes a handoff file. The next session continues from there.</p></div>
+    <div class="card"><h3>Daily report</h3><p>What it cost, what it saved, what it blocked. Every amount is an estimate at API list prices and is marked ≈.</p></div>
+  </div>
+
+  <h2 id="install">Install</h2>
+  <p>Claude Code:</p>
+  <pre><code>claude plugin marketplace add <span class="repo">maxxstm/steinwall</span>
+claude plugin install steinwall@steinwall</code></pre>
+  <p>Codex (then approve the hooks once with <code>/hooks</code>):</p>
+  <pre><code>codex plugin marketplace add <span class="repo">maxxstm/steinwall</span>
+codex plugin add steinwall@steinwall</code></pre>
+  <p class="note">Needs Node.js 20 or newer. Everything runs locally: no prompts, code or keys leave your machine.</p>
+
+  <h2 id="pricing">Pricing</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>Free</h3>
+      <div class="price">$0</div>
+      <ul class="check"><li>Cost brake</li><li>Action guard</li><li>Loop rescue</li><li>Extension scanner</li><li>Limit handoff (same tool)</li><li>Daily report</li></ul>
+    </div>
+    <div class="card">
+      <h3>Pro</h3>
+      <div class="price">$9 <small>/ month</small></div>
+      <p>or $90 / year. 5-day trial included after install.</p>
+      <ul class="check"><li>Model routing to a cheaper subagent</li><li>Context advisor and output trimming</li><li>Your own rules per project</li><li>Dashboard with history</li><li>Handoff between Claude Code and Codex</li><li>Cost coach (beta)</li></ul>
+      <p><button data-plan="monthly">Monthly</button> <button class="secondary" data-plan="yearly">Yearly</button></p>
+    </div>
+    <div class="card">
+      <h3>Founder price</h3>
+      <div class="price">$5 <small>/ month, for life</small></div>
+      <p>Pro for the first 500 users, at this price for as long as you stay.</p>
+      <p><button data-plan="founder">Become a founder</button></p>
+      <p class="note" id="checkout-note" hidden></p>
+    </div>
+  </div>
+  <p class="note">Every Pro user you refer gets you one free month of Pro.</p>
+
+  <h2>Privacy</h2>
+  <p>We ask before we count. Sending your savings to the public counter is a separate opt-in question, and it is off unless you say yes. It sends one number per day and a random install id: no prompts, code, paths or keys. You can switch it off at any time.</p>
+
+  <h2>Guides</h2>
+  <ul>
+    <li><a href="guides/claude-code-kosten-begrenzen.html">Claude Code Kosten begrenzen</a></li>
+    <li><a href="guides/codex-limit-erreicht.html">Codex Limit erreicht – was tun?</a></li>
+  </ul>
+</main>
+<footer>
+  <a href="impressum.html">Impressum</a><a href="datenschutz.html">Datenschutz</a><a href="agb.html">AGB</a><a href="widerruf.html">Widerrufsbelehrung</a><a href="llms.txt">llms.txt</a>
+</footer>
+<script>
+(() => {
+  const cfg = window.STEINWALL || {};
+  document.querySelectorAll(".repo").forEach((el) => (el.textContent = cfg.githubRepo || "maxxstm/steinwall"));
+  const ref = new URLSearchParams(location.search).get("ref");
+  const buttons = document.querySelectorAll("button[data-plan]");
+  if (!cfg.apiUrl) {
+    buttons.forEach((b) => { b.disabled = true; b.title = "Checkout opens at launch"; });
+    return;
+  }
+  fetch(cfg.apiUrl + "/telemetry").then((r) => r.json()).then((d) => {
+    if (d.totalUsd > 0) {
+      document.getElementById("counter-usd").textContent = "≈ $" + Math.round(d.totalUsd).toLocaleString("en-US");
+      document.getElementById("counter").hidden = false;
+    }
+  }).catch(() => {});
+  buttons.forEach((b) => b.addEventListener("click", async () => {
+    b.disabled = true;
+    const note = document.getElementById("checkout-note");
+    try {
+      const r = await fetch(cfg.apiUrl + "/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ plan: b.dataset.plan, ref }) });
+      const d = await r.json();
+      if (d.url) { location.href = d.url; return; }
+      note.textContent = r.status === 409 ? "The founder price is sold out. Pro is still available above." : "Checkout is not available right now. Please try again later.";
+    } catch { note.textContent = "Checkout is not available right now. Please try again later."; }
+    note.hidden = false;
+    b.disabled = false;
+  }));
+})();
+</script>
+</body>
+</html>

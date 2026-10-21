@@ -1,0 +1,14 @@
+{
+  "name": "steinwall",
+  "description": "Local development marketplace for SteinWall (cost brake + action guard for coding agents).",
+  "owner": {
+    "name": "Maximilian Steinmetz"
+  },
+  "plugins": [
+    {
+      "name": "steinwall",
+      "source": "./",
+      "description": "Cost brake, action guard and cost status line for Claude Code."
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude Code Kosten begrenzen: Budget, Warnung, harter Stopp</title>
+<meta name="description" content="So begrenzt du die Kosten von Claude Code: Kosten sichtbar machen, Kontext klein halten, Modelle bewusst wählen und mit einem Tagesbudget einen harten Stopp setzen.">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header><a href="../">SteinWall</a></header>
+<main><article>
+<h1>Claude Code Kosten begrenzen</h1>
+<p class="lead">Claude Code rechnet pro Token ab, über API-Schlüssel oder im Rahmen eines Abos. Teuer wird es selten durch einzelne Fragen. Teuer werden lange Sitzungen, große Kontexte und Agenten, die in Schleifen laufen.</p>
+
+<h2>1. Kosten sichtbar machen</h2>
+<p>Was du nicht siehst, kannst du nicht begrenzen. Claude Code zeigt mit <code>/cost</code> die Kosten der aktuellen Sitzung. Eine Statuszeile, die laufend die Tageskosten anzeigt, ist hilfreicher: Du merkst früh, wenn eine Sitzung aus dem Ruder läuft.</p>
+
+<h2>2. Den Kontext klein halten</h2>
+<p>Jede Anfrage schickt den bisherigen Gesprächsverlauf mit. Bei 150.000 Tokens Kontext kostet schon das Mitschicken spürbar Geld, auch wenn ein Teil davon aus dem Cache kommt. Drei Gewohnheiten helfen:</p>
+<ul>
+<li><code>/compact</code> mit einem Fokus verwenden, sobald eine Aufgabe abgeschlossen ist, z. B. <code>/compact Fokus: Login-Fehler</code>.</li>
+<li>Für neue, unabhängige Aufgaben eine neue Sitzung starten statt die alte weiterzuführen.</li>
+<li>Gezielt lesen lassen: konkrete Dateien und Ordner nennen statt „schau dir das ganze Projekt an“.</li>
+</ul>
+
+<h2>3. Modelle bewusst wählen</h2>
+<p>Das stärkste Modell ist für Planung und schwierige Änderungen da. Suchen, Lesen und Zusammenfassen erledigt ein günstigeres Modell genauso gut, zum Beispiel in einem Subagenten. Mit <code>/model</code> wechselst du das Modell der Sitzung.</p>
+
+<h2>4. Schleifen früh stoppen</h2>
+<p>Ein Agent, der denselben fehlschlagenden Befehl zehnmal wiederholt, zahlt jedes Mal für den ganzen Kontext. Sag ihm nach drei gleichen Fehlern, dass er die Ursache benennen und den Ansatz wechseln soll.</p>
+
+<h2>5. Ein hartes Budget setzen</h2>
+<p>Ein Tages- und ein Monatsbudget mit Warnung vor dem Limit und einem harten Stopp am Limit verhindern den bösen Überraschungsmoment. SteinWall macht das lokal als Plugin für Claude Code und Codex:</p>
+<pre><code>claude plugin marketplace add maxxstm/steinwall
+claude plugin install steinwall@steinwall
+/steinwall:budget --daily 20 --monthly 200</code></pre>
+<p>Bei 80 % kommt eine Warnung. Am Limit werden weitere Aktionen gestoppt, bis du das Budget anhebst oder den Stopp für heute aufhebst. Dazu zeigt SteinWall eine Statuszeile mit den Tageskosten, stoppt Schleifen und blockiert riskante Befehle.</p>
+<p class="note">Alle Beträge sind Schätzungen zu API-Listenpreisen. Bei Abos entsprechen sie dem API-Gegenwert, nicht deiner Rechnung.</p>
+</article></main>
+<footer><a href="../impressum.html">Impressum</a><a href="../datenschutz.html">Datenschutz</a></footer>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "steinwall",
+  "version": "0.1.0",
+  "description": "Guardian for Claude Code: daily/monthly cost brake, blocks or asks before risky actions (recursive delete, force push, .env/SSH key access, curl|sh), live cost status line. Use when costs run high, a usage limit is near, or an agent is about to do something destructive. Spend less. Break nothing.",
+  "author": { "name": "Maximilian Steinmetz" },
+  "homepage": "https://github.com/maxxstm/steinwall",
+  "repository": "https://github.com/maxxstm/steinwall",
+  "keywords": ["cost", "budget", "safety", "guardrails", "hooks", "statusline", "security"]
+}

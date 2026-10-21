@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Codex Limit erreicht – was tun?</title>
+<meta name="description" content="Codex hat ein 5-Stunden- und ein Wochenlimit. Was du tun kannst, wenn es erreicht ist, und wie du vorher so übergibst, dass nach dem Reset nichts verloren geht.">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<header><a href="../">SteinWall</a></header>
+<main><article>
+<h1>Codex Limit erreicht – was tun?</h1>
+<p class="lead">Mit einem ChatGPT-Abo hat Codex zwei Nutzungsfenster: eines über fünf Stunden und eines über eine Woche. Ist eines voll, pausiert Codex bis zum Reset. Ärgerlich wird das vor allem, wenn es mitten in einer Aufgabe passiert.</p>
+
+<h2>Sofort: Was jetzt möglich ist</h2>
+<ul>
+<li><strong>Auf den Reset warten.</strong> Codex zeigt an, wann das Fenster wieder frei ist. Beim 5-Stunden-Fenster sind das oft nur Minuten bis wenige Stunden.</li>
+<li><strong>Mit einem anderen Werkzeug weitermachen.</strong> Ein zweiter Coding-Agent, zum Beispiel Claude Code, kann die Aufgabe übernehmen. Dafür braucht er den Stand: was erledigt ist, was offen ist und was der nächste Schritt ist.</li>
+<li><strong>Kleinere Schritte planen.</strong> Lange Sitzungen mit großem Kontext verbrauchen das Kontingent schneller. Nach dem Reset hilft <code>/compact</code> oder eine frische Sitzung.</li>
+</ul>
+
+<h2>Vorher: rechtzeitig übergeben</h2>
+<p>Ein Limit trifft dich nicht unvorbereitet, wenn der Agent vorher aufschreibt, wo er steht. Eine einfache Übergabedatei im Projekt reicht: Ziel, Erledigt, In Arbeit, Offen, Nächster Schritt, relevante Dateien. Die nächste Sitzung liest sie zuerst und macht dort weiter, ohne Erledigtes zu wiederholen.</p>
+<p>SteinWall automatisiert das. Es liest den Stand beider Codex-Fenster aus den Sitzungsdaten und bittet den Agenten bei 85 % eines Limits, die Datei <code>.steinwall/handoff.md</code> zu füllen. Die nächste Sitzung lädt sie automatisch, in Codex oder mit SteinWall Pro auch in Claude Code.</p>
+<pre><code>codex plugin marketplace add maxxstm/steinwall
+codex plugin add steinwall@steinwall</code></pre>
+<p>Danach in Codex mit <code>/hooks</code> die Hooks von SteinWall einmal prüfen und freigeben.</p>
+<p class="note">Die Grenzen der Fenster legt OpenAI fest. Sie hängen vom Abo ab und können sich ändern.</p>
+</article></main>
+<footer><a href="../impressum.html">Impressum</a><a href="../datenschutz.html">Datenschutz</a></footer>
+</body>
+</html>

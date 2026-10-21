@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your SteinWall Pro license</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="style.css">
+<script src="config.js"></script>
+</head>
+<body>
+<header><a href="./">SteinWall</a></header>
+<main>
+  <h1>Thank you!</h1>
+  <p class="lead" id="status">Fetching your license key…</p>
+  <div id="result" hidden>
+    <p>Activate Pro in Claude Code:</p>
+    <pre><code id="cmd-claude"></code></pre>
+    <p>Or in any terminal (also for Codex):</p>
+    <pre><code id="cmd-cli"></code></pre>
+    <p><button id="copy">Copy license key</button></p>
+    <p>Your referral link: every Pro user who signs up through it gets you one free month.</p>
+    <pre><code id="ref"></code></pre>
+    <p class="note">Keep your key private. It is checked offline and refreshed every few days, which only sends the key itself.</p>
+  </div>
+</main>
+<script>
+(async () => {
+  const cfg = window.STEINWALL || {};
+  const session = new URLSearchParams(location.search).get("session_id");
+  const status = document.getElementById("status");
+  if (!cfg.apiUrl || !session) { status.textContent = "No purchase found on this page. If you have paid, open the link from your confirmation e-mail again."; return; }
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const r = await fetch(cfg.apiUrl + "/license?session_id=" + encodeURIComponent(session)).catch(() => null);
+    if (r && r.status === 200) {
+      const d = await r.json();
+      document.getElementById("cmd-claude").textContent = "/steinwall:license activate " + d.token;
+      document.getElementById("cmd-cli").textContent = "node ~/.steinwall/bin/steinwall.mjs license activate " + d.token;
+      document.getElementById("ref").textContent = location.origin + location.pathname.replace(/license\.html$/, "") + "?ref=" + d.referralCode;
+      document.getElementById("copy").onclick = () => navigator.clipboard.writeText(d.token);
+      status.textContent = "Your Pro license is ready.";
+      document.getElementById("result").hidden = false;
+      return;
+    }
+    await new Promise((res) => setTimeout(res, 2000));
+  }
+  status.textContent = "Your payment went through, but the license is not ready yet. Please reload this page in a minute.";
+})();
+</script>
+</body>
+</html>

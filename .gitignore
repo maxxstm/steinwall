@@ -1,0 +1,11 @@
+node_modules/
+*.tmp
+# Project handoff files written by SteinWall itself.
+.steinwall/
+# Never commit license signing keys.
+*.jwk.json
+# dist/ is committed on purpose: plugins are installed from the repo without a build step.
+
+# Private planning documents: never publish.
+steinguard-briefing.md
+docs/LAUNCH.md
