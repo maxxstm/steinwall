@@ -13,3 +13,17 @@ await build({
   legalComments: "none",
   logLevel: "warning",
 });
+
+// SteinWall Lite for Codex: one self-contained script inside the skill folder of the hook-free plugin.
+await build({
+  entryPoints: { "steinwall-lite": "src/bin/codex-lite.ts" },
+  outdir: "lite/codex/skills/steinwall-lite/scripts",
+  outExtension: { ".js": ".mjs" },
+  bundle: true,
+  platform: "node",
+  format: "esm",
+  target: "node20",
+  minify: true,
+  legalComments: "none",
+  logLevel: "warning",
+});

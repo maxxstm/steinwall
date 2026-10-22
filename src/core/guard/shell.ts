@@ -11,6 +11,8 @@ export interface Segment {
 const SHELLS_WITH_INLINE_SCRIPT = new Set(["sh", "bash", "zsh", "dash", "ksh", "fish", "pwsh", "powershell", "cmd", "eval"]);
 const INLINE_FLAGS = new Set(["-c", "-command", "/c", "/k", "-encodedcommand"]);
 const HEREDOC_SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh", "fish", "source", "."]);
+/** Placeholder token for a PowerShell here-string's text. */
+const HERE_STRING = "\u0000here-string:";
 
 export function parseShell(command: string, depth = 0): Segment[] {
   const segments: Segment[] = [];
@@ -33,6 +35,7 @@ export function parseShell(command: string, depth = 0): Segment[] {
   };
   // Heredocs (`cmd <<'EOF' ... EOF`) waiting for their body, which starts after the current line.
   const heredocs: { delim: string; stripTabs: boolean; runsBody: boolean }[] = [];
+  const hereStrings: string[] = [];
 
   for (let i = 0; i < command.length; i++) {
     const c = command[i]!;
@@ -64,6 +67,18 @@ export function parseShell(command: string, depth = 0): Segment[] {
         i = pos - 2; // continue right after the delimiter line
       }
       continue;
+    }
+    // PowerShell here-string (`@'` or `@"` at the end of a line, closed by `'@` / `"@` at the start of
+    // one). Its text is data, e.g. a script piped into `node -`, unless it is piped into a shell.
+    if (!quote && c === "@" && (next === "'" || next === '"') && /^\r?\n/.test(command.slice(i + 2))) {
+      const close = new RegExp(`\\r?\\n${next}@`).exec(command.slice(i + 2));
+      if (close) {
+        endToken();
+        hereStrings.push(command.slice(i + 2, i + 2 + close.index).replace(/^\r?\n/, ""));
+        tokens.push(`${HERE_STRING}${hereStrings.length - 1}`);
+        i += 2 + close.index + close[0].length - 1;
+        continue;
+      }
     }
     if (quote) {
       if (c === quote) quote = null;
@@ -102,6 +117,17 @@ export function parseShell(command: string, depth = 0): Segment[] {
     }
   }
   endSegment(false);
+
+  // A here-string piped into a shell (`@'...'@ | pwsh -`, `| iex`) is code after all.
+  if (depth < 3 && hereStrings.length) {
+    for (const [k, seg] of segments.entries()) {
+      const name = commandName(seg.tokens[0] ?? "");
+      if (!seg.piped || !(SHELLS_WITH_INLINE_SCRIPT.has(name) || name === "iex" || name === "invoke-expression")) continue;
+      for (const t of segments[k - 1]?.tokens ?? []) {
+        if (t.startsWith(HERE_STRING)) segments.push(...parseShell(hereStrings[Number(t.slice(HERE_STRING.length))] ?? "", depth + 1));
+      }
+    }
+  }
 
   // Look inside `bash -c "..."`, `pwsh -Command "..."`, `eval "..."`.
   if (depth < 3) {

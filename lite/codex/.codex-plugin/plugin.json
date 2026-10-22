@@ -1,0 +1,26 @@
+{
+  "name": "steinwall-lite",
+  "version": "0.1.0",
+  "description": "Daily cost briefing for Codex: what today cost at API prices, how much of your limits is used, and which stuck loops and risky commands full SteinWall would have caught. Also scans skills, plugins and MCP servers for malicious patterns. Read-only, runs locally.",
+  "author": {
+    "name": "Maximilian Steinmetz",
+    "url": "https://github.com/maxxstm"
+  },
+  "homepage": "https://steinwall.dev",
+  "repository": "https://github.com/maxxstm/steinwall",
+  "keywords": ["cost", "budget", "usage", "limits", "security", "scanner", "mcp", "report"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "SteinWall Lite",
+    "shortDescription": "Daily cost briefing and extension scanner for Codex.",
+    "longDescription": "SteinWall Lite reads Codex's own session logs on your machine and gives you a daily briefing: cost at API list prices, models, 5-hour and weekly limits, and an estimate of what full SteinWall would have saved by stopping stuck loops and risky commands. It also checks skills, plugins and MCP servers for prompt injection, hidden shell commands and data exfiltration before you install them. Nothing leaves your machine. The free full edition adds automatic protection through hooks; SteinWall Pro adds more savings for Claude Code and Codex.",
+    "developerName": "Maximilian Steinmetz",
+    "category": "Developer Tools",
+    "capabilities": ["Read"],
+    "websiteURL": "https://steinwall.dev",
+    "privacyPolicyURL": "https://steinwall.dev/datenschutz.html",
+    "composerIcon": "./assets/icon.svg",
+    "logo": "./assets/icon.svg",
+    "defaultPrompt": "Show my SteinWall daily briefing"
+  }
+}

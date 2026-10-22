@@ -128,3 +128,12 @@ test("secret paths", () => {
     assert.ok(!isSecretPath(p), p);
   }
 });
+
+test("PowerShell here-strings are data unless piped into a shell", () => {
+  const script = "@'\nimport fs from 'node:fs';\nconst s = fs.readFileSync('src/TopicTree.tsx', 'utf8');\nfs.writeFileSync('src/types.ts', s);\n'@ | node -";
+  assert.equal(verdict(script), null, "a script piped into node is not a path");
+  assert.equal(verdict("@\"\nnotes about .env and id_rsa\n\"@ | Set-Content notes.txt"), null, "text written to a file");
+  assert.equal(verdict("@'\nRemove-Item -Recurse -Force ~\n'@ | powershell -"), "deny:recursive-delete", "piped into a shell it runs");
+  assert.equal(verdict("@'\nGet-Content .env\n'@ | iex"), "ask:secret-access");
+  assert.equal(verdict("@'\nhello\n'@ | node -; cat .env"), "ask:secret-access", "commands after the here-string still count");
+});
