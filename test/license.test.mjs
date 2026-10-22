@@ -61,6 +61,21 @@ test("refresh: new token stored, 410 revokes, network errors keep the token", as
   assert.equal(lic.proStatus(Date.now() + 20 * DAY, spki).pro, false);
 });
 
+test("manage: the portal link is requested with the stored key only", async () => {
+  lic.activateLicense(await token(Date.now() + 30 * DAY), spki);
+  let sent;
+  const url = await lic.portalUrl("https://api.example/", async (u, init) => {
+    sent = { u, body: JSON.parse(init.body) };
+    return new Response(JSON.stringify({ url: "https://billing.stripe.test/p/1" }), { status: 200 });
+  });
+  assert.equal(url, "https://billing.stripe.test/p/1");
+  assert.equal(sent.u, "https://api.example/portal");
+  assert.deepEqual(Object.keys(sent.body), ["token"]);
+  await assert.rejects(lic.portalUrl("https://api.example", async () => new Response(JSON.stringify({ error: "unknown license" }), { status: 404 })), /unknown license/);
+  lic.deactivateLicense();
+  await assert.rejects(lic.portalUrl("https://api.example", async () => new Response("{}")), /no license activated/);
+});
+
 test("Stripe webhook signature: valid, wrong secret, replayed", async () => {
   const body = JSON.stringify({ type: "checkout.session.completed" });
   const t = Math.floor(Date.now() / 1000);

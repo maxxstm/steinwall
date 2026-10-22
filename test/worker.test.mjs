@@ -20,6 +20,7 @@ function fakeD1() {
     bind: (...values) => statement(sql, values),
     first: async () => db.prepare(sql).get(...params) ?? null,
     run: async () => ({ results: [], meta: { changes: Number(db.prepare(sql).run(...params).changes) } }),
+    all: async () => ({ results: db.prepare(sql).all(...params), meta: { changes: 0 } }),
   });
   return { prepare: (sql) => statement(sql), batch: async (list) => Promise.all(list.map((s) => s.run())), sqlite: db };
 }
@@ -37,13 +38,24 @@ function makeEnv() {
     STRIPE_SECRET_KEY: "sk_test_worker",
     STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET,
     LICENSE_PRIVATE_JWK: jwk,
+    RESEND_API_KEY: "re_test_worker",
+    OWNER_EMAIL: "owner@example.test",
   };
 }
 
-/** Stripe API mock: subscriptions report a period end in 30 days (on the item, like newer API versions). */
+/**
+ * Stripe and Resend mock: subscriptions report a period end in 30 days (on the item, like newer API
+ * versions); sent mails are collected in `mails`.
+ */
 const stripeCalls = [];
+const mails = [];
 globalThis.fetch = async (url, init = {}) => {
-  stripeCalls.push({ url: String(url), body: init.body });
+  if (String(url) === "https://api.resend.com/emails") {
+    mails.push(JSON.parse(init.body));
+    return Response.json({ id: "mail_1" });
+  }
+  stripeCalls.push({ url: String(url), method: init.method, body: init.body });
+  if (String(url).endsWith("/billing_portal/sessions")) return Response.json({ url: "https://billing.stripe.test/p/session_1" });
   if (String(url).includes("/subscriptions/")) {
     const id = String(url).split("/subscriptions/")[1];
     return Response.json({ id, status: "active", customer: "cus_x", items: { data: [{ current_period_end: Math.floor((Date.now() + 30 * DAY) / 1000) }] } });
@@ -64,7 +76,7 @@ function webhook(event, secret = WEBHOOK_SECRET) {
 
 const completed = (session, customer, ref) => ({
   type: "checkout.session.completed",
-  data: { object: { id: session, subscription: `sub_${session}`, customer, client_reference_id: ref, customer_details: { email: "a@example.test" }, metadata: { plan: "monthly" } } },
+  data: { object: { id: session, subscription: `sub_${session}`, customer, client_reference_id: ref, customer_details: { email: "a@example.test", address: { country: "DE" } }, metadata: { plan: "monthly" } } },
 });
 
 test("checkout creates a Stripe session with the plan's price and the site's return urls", async () => {
@@ -173,4 +185,91 @@ test("routing, CORS and errors", async () => {
   const res = await handle(post("/checkout", { plan: "monthly" }), { ...env, STRIPE_SECRET_KEY: "" });
   assert.equal(res.status, 500, "a missing secret is a 500, not a crash");
   assert.equal((await handle(req("/telemetry"), { ...env, SITE_ORIGIN: "https://steinwall.example" })).headers.get("access-control-allow-origin"), "https://steinwall.example");
+});
+
+test("the license key is emailed once per purchase, in the buyer's language", async () => {
+  const env = makeEnv();
+  mails.length = 0;
+  await handle(webhook(completed("cs_mail", "cus_mail")), env);
+  await handle(webhook(completed("cs_mail", "cus_mail")), env);
+  assert.equal(mails.length, 1, "a duplicate webhook sends no second mail");
+  const m = mails[0];
+  assert.deepEqual(m.to, ["a@example.test"]);
+  assert.equal(m.from, "SteinWall <license@steinwall.dev>");
+  assert.match(m.subject, /Lizenzschlüssel/);
+  const token = /license activate (SW1\.\S+)/.exec(m.text)[1];
+  assert.ok(await verifyLicense(token, pair.publicKey), "the mailed key is valid");
+  assert.match(m.text, /kuendigen\.html/);
+  assert.ok(env.DB.sqlite.prepare("select key_emailed_at from licenses where checkout_session = 'cs_mail'").get().key_emailed_at);
+});
+
+test("a failing mail service does not fail the webhook", async () => {
+  const env = makeEnv();
+  const res = await handle(webhook(completed("cs_nomail", "cus_nomail")), { ...env, RESEND_API_KEY: "" });
+  assert.equal(res.status, 200);
+  assert.equal(env.DB.sqlite.prepare("select count(*) as n from licenses where checkout_session = 'cs_nomail'").get().n, 1);
+});
+
+test("lost key: neutral answer, keys only to known addresses, at most every 10 minutes", async () => {
+  const env = makeEnv();
+  await handle(webhook(completed("cs_lost", "cus_lost")), env);
+  mails.length = 0;
+  const first = await handle(post("/license/resend", { email: "A@Example.test" }), env);
+  const unknown = await handle(post("/license/resend", { email: "nobody@example.test" }), env);
+  assert.deepEqual(await first.json(), await unknown.json(), "the answer does not reveal whether the address has a license");
+  assert.equal(mails.length, 1);
+  assert.match(mails[0].text, /license activate SW1\./);
+  await handle(post("/license/resend", { email: "a@example.test" }), env);
+  assert.equal(mails.length, 1, "rate limited");
+  assert.equal((await handle(post("/license/resend", { email: "not-an-email" }), env)).status, 400);
+});
+
+test("portal: a valid key opens the Stripe customer portal, a forged one does not", async () => {
+  const env = makeEnv();
+  await handle(webhook(completed("cs_portal", "cus_portal")), env);
+  const { token } = await (await handle(req("/license?session_id=cs_portal"), env)).json();
+  stripeCalls.length = 0;
+  const res = await handle(post("/portal", { token }), env);
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).url, "https://billing.stripe.test/p/session_1");
+  assert.match(decodeURIComponent(stripeCalls[0].body), /customer=cus_portal&return_url=https:\/\/example\.test/);
+  assert.equal((await handle(post("/portal", { token: "SW1.forged.sig" }), env)).status, 400);
+});
+
+test("cancel button: ends the subscription at period end and confirms by email", async () => {
+  const env = makeEnv();
+  await handle(webhook(completed("cs_cancel", "cus_cancel")), env);
+  mails.length = 0;
+  stripeCalls.length = 0;
+  const res = await handle(post("/cancel", { email: "a@example.test", kind: "ordinary" }), env);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.contracts.length, 1);
+  assert.equal(stripeCalls[0].method, "POST");
+  assert.match(stripeCalls[0].url, /\/subscriptions\/sub_cs_cancel$/);
+  assert.equal(stripeCalls[0].body, "cancel_at_period_end=true");
+  assert.equal(mails.length, 1, "an ordinary, matched cancellation needs no owner notice");
+  assert.match(mails[0].subject, /Kündigung/);
+  assert.match(mails[0].text, /Eingang: .*\(Europe\/Berlin\)/);
+  assert.match(mails[0].text, /endet zum/);
+  assert.equal(env.DB.sqlite.prepare("select matched from cancellations").get().matched, 1);
+});
+
+test("cancel button without a matching subscription: receipt confirmed, owner notified, no mail flood", async () => {
+  const env = makeEnv();
+  mails.length = 0;
+  const res = await handle(post("/cancel", { email: "stranger@example.test", kind: "extraordinary", reason: "moving" }), env);
+  assert.equal((await res.json()).contracts.length, 0);
+  assert.deepEqual(mails.map((m) => m.to[0]), ["stranger@example.test", "owner@example.test"]);
+  assert.match(mails[0].text, /no active subscription|kein aktives Abo/);
+  assert.match(mails[1].subject, /without matching subscription/);
+  await handle(post("/cancel", { email: "stranger@example.test" }), env);
+  assert.equal(mails.filter((m) => m.to[0] === "stranger@example.test").length, 1, "no second confirmation within 10 minutes");
+  assert.equal(env.DB.sqlite.prepare("select count(*) as n from cancellations").get().n, 2, "every declaration is still logged");
+});
+
+test("health names a wrong mail key", async () => {
+  const env = makeEnv();
+  const { problems } = await (await handle(req("/health"), { ...env, RESEND_API_KEY: "sk_test_x" })).json();
+  assert.deepEqual(problems, ["RESEND_API_KEY must start with re_, but starts with sk_"]);
 });

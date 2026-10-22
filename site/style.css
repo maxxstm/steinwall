@@ -53,3 +53,9 @@ footer a { color: var(--muted); }
 article { max-width: 720px; }
 article h1 { font-size: clamp(28px, 5vw, 40px); }
 @media (max-width: 560px) { nav a { margin-left: 10px; } }
+form.stack { display: grid; gap: 14px; max-width: 520px; margin-top: 20px; }
+form.stack label { display: grid; gap: 6px; font-weight: 600; }
+form.stack input, form.stack select, form.stack textarea { font: inherit; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: inherit; }
+form.stack fieldset { border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; display: grid; gap: 8px; }
+form.stack fieldset label { font-weight: 400; display: flex; gap: 8px; align-items: center; }
+.box { border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; margin-top: 20px; }

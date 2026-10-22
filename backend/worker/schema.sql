@@ -32,3 +32,18 @@ create table if not exists telemetry_daily (
   received_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   primary key (install_id, day)
 );
+
+-- 2026-10-22: license mails and the cancel button.
+alter table licenses add column key_emailed_at text;
+alter table licenses add column last_resend_at text;
+alter table licenses add column lang text;
+
+-- Every cancellation received through the cancel button (§ 312k BGB), as proof of receipt.
+create table if not exists cancellations (
+  id integer primary key autoincrement,
+  received_at text not null,
+  email text not null,
+  kind text not null,                         -- ordinary | extraordinary
+  reason text,
+  matched integer not null default 0          -- subscriptions ended at period end
+);

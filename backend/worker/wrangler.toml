@@ -1,6 +1,6 @@
 # SteinWall backend: one Worker plus a D1 database. Deploy from this folder with `npx wrangler deploy`.
 # Secrets are set in the Cloudflare dashboard (Worker -> Settings -> Variables and Secrets) or with
-# `npx wrangler secret put <NAME>`: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, LICENSE_PRIVATE_JWK.
+# `npx wrangler secret put <NAME>`: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, LICENSE_PRIVATE_JWK, RESEND_API_KEY.
 name = "steinwall-api"
 main = "src/index.ts"
 compatibility_date = "2026-10-01"
@@ -20,6 +20,7 @@ database_id = "70b930dc-f7ff-4bbd-aab1-367ef815b72e"
 [vars]
 SITE_URL = "https://steinwall.dev"
 SITE_ORIGIN = "https://steinwall.dev"
+OWNER_EMAIL = "hello@steinwall.dev"
 STRIPE_PRICE_MONTHLY = "price_1UT6ZC6zEkNTIBlA0GvV7bN0"
 STRIPE_PRICE_YEARLY = "price_1UT6ZE6zEkNTIBlANZKmoPyt"
 STRIPE_PRICE_FOUNDER = "price_1UT6ZG6zEkNTIBlAN99S4SVh"

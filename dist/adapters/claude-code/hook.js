@@ -6,7 +6,7 @@
 import { mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { loadConfig, resolveLanguage } from "../../core/config.js";
-import { checkExtensions, creditProSavings, creditSavings, dailySummary, recordScan, recordGuardDecision, recordLoopEvent, refresh, updateToday, withSession } from "../../core/engine.js";
+import { checkExtensions, creditProSavings, creditSavings, dailySummary, trialNotice, recordScan, recordGuardDecision, recordLoopEvent, refresh, updateToday, withSession } from "../../core/engine.js";
 import { logError } from "../../core/fsutil.js";
 import { checkToolCall } from "../../core/guard/index.js";
 import { nearLimit, readHandoff, writeAutoSection } from "../../core/handoff.js";
@@ -263,11 +263,13 @@ function sessionStart(input, cfg, lang, session) {
     const budgetNote = announcement(safeRefresh(cfg, session), lang);
     // Yesterday in one line, once per day, at the first session start: a moment of visible value, no popup.
     const summary = safe(() => dailySummary(cfg, lang));
+    // The best upgrade moment is the end of the trial, with the user's own measured Pro savings.
+    const trial = safe(() => trialNotice(lang));
     // Extensions installed since the last check (also outside SteinWall's view, e.g. via /plugin).
     const ext = cfg.scanner.enabled ? safe(() => checkExtensions(input.cwd, cfg.scanner)) : null;
     // Licensing and opt-in telemetry run in the background so they never delay the session.
     safe(() => backgroundTasks(cfg));
-    const systemMessage = [budgetNote?.systemMessage, summary, flaggedUserMessage(ext?.flagged, lang), safe(() => telemetryQuestionOnce(cfg, lang))].filter(Boolean).join("\n");
+    const systemMessage = [budgetNote?.systemMessage, summary, trial, flaggedUserMessage(ext?.flagged, lang), safe(() => telemetryQuestionOnce(cfg, lang))].filter(Boolean).join("\n");
     const note = systemMessage ? { systemMessage } : null;
     const contexts = [];
     if (ext?.flaggedNames.length)

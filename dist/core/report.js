@@ -97,10 +97,14 @@ export function buildReport(cfg, lang, date = localDay()) {
  * The only upgrade hint: in the report, right under the savings, and only with a measured number:
  * what the Pro features saved in this user's own trial. Never shown to Pro users, never a forecast.
  */
+/** What the Pro features (routing, trimmed output) saved in the last `days` days up to `date`. */
+export function proSavedRecently(date, days = 30) {
+    return lastDays(date, days).reduce((s, d) => s + (d.savings.bySource?.routing ?? 0) + (d.savings.bySource?.trim ?? 0), 0);
+}
 export function upgradeLine(lang, date, status = proStatus()) {
     if (status.reason === "license" || status.reason === "grace")
         return null;
-    const proSaved = lastDays(date, 30).reduce((s, d) => s + (d.savings.bySource?.routing ?? 0) + (d.savings.bySource?.trim ?? 0), 0);
+    const proSaved = proSavedRecently(date);
     if (proSaved < 0.01)
         return null;
     if (status.reason === "trial") {
@@ -126,6 +130,40 @@ export function shortSummary(cfg, lang, date) {
     if (blocked > 0)
         parts.push(`${blocked} ${de ? "Aktionen abgefangen" : "actions intercepted"}`);
     return `SteinWall ${de ? "gestern" : "yesterday"}: ${parts.join(" · ")}. ${de ? "Details" : "Details"}: /steinwall:report --date ${date}`;
+}
+const trialNoticeFile = () => join(stateDir(), "trial-notice.json");
+/**
+ * The end of the trial, said twice at most: on the last trial day and at the first session after
+ * it. With the measured Pro savings when there are any, otherwise one neutral line. Never for
+ * license holders. Call only while holding the state lock.
+ */
+export function trialNoticeOnce(lang, now = new Date(), status = proStatus(now.getTime())) {
+    if (status.reason === "license" || status.reason === "grace")
+        return null;
+    const shown = readJson(trialNoticeFile(), {});
+    const de = lang === "de";
+    const saved = proSavedRecently(localDay(now));
+    const amount = saved >= 0.01 ? money(lang, saved) : null;
+    if (status.reason === "trial" && status.trialDaysLeft === 1 && !shown.ending) {
+        writeJson(trialNoticeFile(), { ...shown, ending: true });
+        if (amount) {
+            return de
+                ? `SteinWall Pro: Die Testphase endet morgen. Pro hat bisher ≈ ${amount} zusätzlich gespart (günstigere Subagenten, gekürzte Ausgaben). Pro behalten: steinwall license`
+                : `SteinWall Pro: your trial ends tomorrow. Pro has saved an extra ≈ ${amount} so far (cheaper subagents, trimmed output). Keep Pro: steinwall license`;
+        }
+        return de ? "SteinWall Pro: Die Testphase endet morgen. Pro behalten: steinwall license" : "SteinWall Pro: your trial ends tomorrow. Keep Pro: steinwall license";
+    }
+    if (status.reason === "none" && !shown.ended) {
+        writeJson(trialNoticeFile(), { ending: true, ended: true });
+        const free = de ? "Kostenbremse, Aktionsschutz, Schleifen-Rettung und Scanner bleiben kostenlos." : "Cost brake, action guard, loop rescue and the scanner stay free.";
+        if (amount) {
+            return de
+                ? `SteinWall Pro: Die Testphase ist vorbei. Pro hat darin ≈ ${amount} zusätzlich gespart. ${free} Pro: 9 $/Monat – steinwall license`
+                : `SteinWall Pro: your trial has ended. Pro saved an extra ≈ ${amount} during it. ${free} Pro: $9/month – steinwall license`;
+        }
+        return de ? `SteinWall Pro: Die Testphase ist vorbei. ${free} Details: steinwall license` : `SteinWall Pro: your trial has ended. ${free} Details: steinwall license`;
+    }
+    return null;
 }
 const reportShownFile = () => join(stateDir(), "report-shown.json");
 /** Yesterday's summary, once per day. Call only while holding the state lock. */

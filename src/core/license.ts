@@ -111,6 +111,22 @@ export function deactivateLicense(): void {
   writeJson(licenseFile(), {});
 }
 
+/** A link to the Stripe customer portal (payment method, invoices) for the activated license. */
+export async function portalUrl(apiUrl: string, fetchImpl: typeof fetch = fetch): Promise<string> {
+  const token = readJson<LicenseState>(licenseFile(), {}).token;
+  if (!token) throw new Error("no license activated");
+  if (!apiUrl) throw new Error("no backend configured (license.apiUrl)");
+  const res = await fetchImpl(`${apiUrl.replace(/\/$/, "")}/portal`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ token }),
+    signal: AbortSignal.timeout(10_000),
+  });
+  const body = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+  if (!res.ok || !body.url) throw new Error(body.error ?? `portal request failed (${res.status})`);
+  return body.url;
+}
+
 export function refreshDue(now = Date.now()): boolean {
   const state = readJson<LicenseState>(licenseFile(), {});
   return !!state.token && now - (state.refreshedAt ?? 0) > REFRESH_EVERY_DAYS * DAY;

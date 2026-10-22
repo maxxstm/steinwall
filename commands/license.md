@@ -1,6 +1,6 @@
 ---
 description: Show SteinWall Pro status (trial, license) or activate a license key, e.g. "/steinwall:license activate SW1....".
-argument-hint: "[activate <key> | refresh]"
+argument-hint: "[activate <key> | manage | refresh]"
 disable-model-invocation: true
 allowed-tools: Bash(node:*)
 ---

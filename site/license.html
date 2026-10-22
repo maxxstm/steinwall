@@ -21,15 +21,39 @@
     <p><button id="copy">Copy license key</button></p>
     <p>Your referral link: every Pro user who signs up through it gets you one free month.</p>
     <pre><code id="ref"></code></pre>
-    <p class="note">Keep your key private. It is checked offline and refreshed every few days, which only sends the key itself.</p>
+    <p class="note">We have also emailed the key to the address you used at checkout. Keep it private: it is checked offline and refreshed every few days, which only sends the key itself.</p>
+  </div>
+  <div id="lost" hidden>
+    <h2>Lost your key?</h2>
+    <p>Enter the email address you used at checkout. If it has an active SteinWall Pro license, we send the key there.</p>
+    <form class="stack" id="lost-form">
+      <label>Email <input type="email" name="email" required autocomplete="email"></label>
+      <p><button type="submit">Send my key</button></p>
+    </form>
+    <p class="note" id="lost-status"></p>
   </div>
 </main>
+<footer><a href="manage.html">Lizenz verwalten</a><a href="kuendigen.html">Verträge hier kündigen</a><a href="impressum.html">Impressum</a><a href="datenschutz.html">Datenschutz</a><a href="agb.html">AGB</a></footer>
 <script>
 (async () => {
   const cfg = window.STEINWALL || {};
   const session = new URLSearchParams(location.search).get("session_id");
   const status = document.getElementById("status");
-  if (!cfg.apiUrl || !session) { status.textContent = "No purchase found on this page. If you have paid, open the link from your confirmation e-mail again."; return; }
+  if (!cfg.apiUrl || !session) {
+    document.querySelector("h1").textContent = "Your SteinWall Pro license";
+    status.textContent = "Your license key was emailed to you after the purchase.";
+    const form = document.getElementById("lost-form");
+    const out = document.getElementById("lost-status");
+    document.getElementById("lost").hidden = false;
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      form.querySelector("button").disabled = true;
+      const r = await fetch(cfg.apiUrl + "/license/resend", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: form.email.value }) }).catch(() => null);
+      out.textContent = r && r.ok ? (await r.json()).message : "That did not work. Please check the address or try again later.";
+      form.querySelector("button").disabled = false;
+    };
+    return;
+  }
   for (let attempt = 0; attempt < 10; attempt++) {
     const r = await fetch(cfg.apiUrl + "/license?session_id=" + encodeURIComponent(session)).catch(() => null);
     if (r && r.status === 200) {

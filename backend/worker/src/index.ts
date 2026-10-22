@@ -6,6 +6,11 @@
 //   GET  /telemetry        -> { totalUsd, installs } for the public counter
 //   POST /telemetry        { installId, day, savedUsd } opt-in, one number per install and day
 //   GET  /health           { ok, problems } setup check: missing or swapped secrets, never their values
+//   POST /license/resend   { email } -> neutral answer; emails the keys of that address (at most every 10 minutes)
+//   POST /portal           { token } -> { url } of the Stripe customer portal (payment method, invoices)
+//   POST /cancel           { email, kind, reason?, key? } cancel button (§ 312k BGB): ends subscriptions at
+//                          period end and confirms in text form by email
+import { cancellationMail, type CancelledContract, type Lang, langFor, licenseMail, ownerMail, resendMail, sendEmail } from "./email.ts";
 import { importPrivateKey, licenseExpiry, type LicensePayload, newReferralCode, publicKeyFromPrivate, signLicense, verifyLicense } from "./license.ts";
 import { stripe, verifyStripeSignature } from "./stripe.ts";
 
@@ -18,6 +23,7 @@ export interface D1PreparedStatement {
   bind(...values: unknown[]): D1PreparedStatement;
   first<T = Record<string, unknown>>(): Promise<T | null>;
   run(): Promise<D1Result>;
+  all<T = Record<string, unknown>>(): Promise<D1Result<T>>;
 }
 export interface D1Database {
   prepare(sql: string): D1PreparedStatement;
@@ -35,6 +41,9 @@ export interface Env {
   STRIPE_SECRET_KEY: string;
   STRIPE_WEBHOOK_SECRET: string;
   LICENSE_PRIVATE_JWK: string;
+  RESEND_API_KEY: string;
+  /** Where cancellations that need a human and other notices go. */
+  OWNER_EMAIL?: string;
 }
 
 const FOUNDER_LIMIT = 500;
@@ -43,6 +52,9 @@ const GRACE_MS = 7 * 24 * 3600 * 1000;
 const PRICES = { monthly: "STRIPE_PRICE_MONTHLY", yearly: "STRIPE_PRICE_YEARLY", founder: "STRIPE_PRICE_FOUNDER" } as const;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const LICENSE_COLUMNS = "id, plan, status, founder, referral_code, period_end, bonus_days";
+const EMAIL = /^[^\s@<>"]{1,64}@[^\s@<>"]{1,255}\.[a-z]{2,}$/i;
+/** One resent key mail or cancellation mail per address in this window, so the forms cannot spam. */
+const MAIL_COOLDOWN_MS = 10 * 60 * 1000;
 
 interface LicenseRow {
   id: string;
@@ -87,6 +99,7 @@ export function secretProblem(name: keyof Env, value: string | undefined): strin
     const hint = /^(sk|rk)_/.test(value) ? " (this is the Stripe secret key)" : "";
     return `STRIPE_WEBHOOK_SECRET must start with whsec_, but starts with ${prefix}${hint}`;
   }
+  if (name === "RESEND_API_KEY" && !value.startsWith("re_")) return `RESEND_API_KEY must start with re_, but starts with ${prefix}`;
   if (name === "LICENSE_PRIVATE_JWK") {
     try {
       const jwk = JSON.parse(value) as JsonWebKey;
@@ -98,7 +111,7 @@ export function secretProblem(name: keyof Env, value: string | undefined): strin
   return null;
 }
 
-const REQUIRED: (keyof Env)[] = ["SITE_URL", "STRIPE_PRICE_MONTHLY", "STRIPE_PRICE_YEARLY", "STRIPE_PRICE_FOUNDER", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "LICENSE_PRIVATE_JWK"];
+const REQUIRED: (keyof Env)[] = ["SITE_URL", "STRIPE_PRICE_MONTHLY", "STRIPE_PRICE_YEARLY", "STRIPE_PRICE_FOUNDER", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "LICENSE_PRIVATE_JWK", "RESEND_API_KEY"];
 
 /** Setup check without revealing anything: which settings are missing or look wrong. */
 async function health(_req: Request, env: Env): Promise<Response> {
@@ -180,17 +193,31 @@ async function stripeWebhook(req: Request, env: Env): Promise<Response> {
   const event = JSON.parse(raw) as { type: string; data: { object: Record<string, unknown> } };
 
   if (event.type === "checkout.session.completed") {
-    const s = event.data.object as { id: string; subscription: string; customer: string; client_reference_id?: string; customer_details?: { email?: string }; metadata?: { plan?: string } };
+    const s = event.data.object as { id: string; subscription: string; customer: string; client_reference_id?: string; customer_details?: { email?: string; address?: { country?: string } }; metadata?: { plan?: string } };
     const sub = await stripe<Subscription>(secret(env, "STRIPE_SECRET_KEY"), "GET", `/subscriptions/${s.subscription}`);
     const plan = s.metadata?.plan ?? "monthly";
     const id = crypto.randomUUID();
+    const row: LicenseRow = { id, plan, status: "active", founder: plan === "founder" ? 1 : 0, referral_code: newReferralCode(), period_end: periodEnd(sub), bonus_days: 0 };
+    const email = s.customer_details?.email ?? null;
+    const lang = langFor(s.customer_details?.address?.country);
     // Stripe may deliver an event twice: the unique checkout_session makes the second insert a no-op.
     const inserted = await env.DB.prepare(
-      `insert or ignore into licenses (id, stripe_customer, stripe_subscription, checkout_session, email, plan, founder, referral_code, referred_by, period_end)
-       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `insert or ignore into licenses (id, stripe_customer, stripe_subscription, checkout_session, email, plan, founder, referral_code, referred_by, period_end, lang)
+       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-      .bind(id, s.customer, s.subscription, s.id, s.customer_details?.email ?? null, plan, plan === "founder" ? 1 : 0, newReferralCode(), s.client_reference_id ?? null, periodEnd(sub))
+      .bind(id, s.customer, s.subscription, s.id, email, plan, row.founder, row.referral_code, s.client_reference_id ?? null, row.period_end, lang)
       .run();
+
+    // The key by email, so a closed success page does not lose it. Only for the first delivery of the
+    // event, and a mail failure never fails the webhook (Stripe would retry the whole event).
+    if (inserted.meta.changes === 1 && email) {
+      try {
+        await sendEmail(mailEnv(env), licenseMail(lang, email, await tokenFor(env, row), row.referral_code));
+        await env.DB.prepare("update licenses set key_emailed_at = ? where id = ?").bind(new Date().toISOString(), id).run();
+      } catch (err) {
+        console.error("license mail failed", err);
+      }
+    }
 
     // Referral: one free month for the referrer per new paying customer (not for self-referral).
     if (inserted.meta.changes === 1 && s.client_reference_id) {
@@ -256,11 +283,117 @@ async function telemetry(req: Request, env: Env): Promise<Response> {
   return json(env, { ok: true });
 }
 
+function mailEnv(env: Env) {
+  return { RESEND_API_KEY: secret(env, "RESEND_API_KEY"), OWNER_EMAIL: env.OWNER_EMAIL };
+}
+
+const recent = (iso: string | null | undefined, now = Date.now()) => !!iso && now - new Date(iso).getTime() < MAIL_COOLDOWN_MS;
+
+async function jsonBody<T>(req: Request): Promise<Partial<T>> {
+  return (await req.json().catch(() => ({}))) as Partial<T>;
+}
+
+// The answer never says whether the address has a license, so the form cannot be used to probe.
+async function licenseResend(req: Request, env: Env): Promise<Response> {
+  if (req.method !== "POST") return json(env, { error: "POST only" }, 405);
+  const { email } = await jsonBody<{ email: string }>(req);
+  if (typeof email !== "string" || !EMAIL.test(email.trim())) return json(env, { error: "invalid email" }, 400);
+  const address = email.trim();
+  const neutral = json(env, { ok: true, message: "If this address has an active SteinWall Pro license, the key is on its way." });
+  const { results } = await env.DB.prepare(`select ${LICENSE_COLUMNS}, lang, last_resend_at from licenses where lower(email) = lower(?) and status <> 'canceled'`)
+    .bind(address)
+    .all<LicenseRow & { lang: Lang | null; last_resend_at: string | null }>();
+  if (!results.length || results.some((r) => recent(r.last_resend_at))) return neutral;
+  const tokens = await Promise.all(results.map((r) => tokenFor(env, r)));
+  await sendEmail(mailEnv(env), resendMail(results[0]!.lang ?? "en", address, tokens));
+  const now = new Date().toISOString();
+  await env.DB.batch(results.map((r) => env.DB.prepare("update licenses set last_resend_at = ? where id = ?").bind(now, r.id)));
+  return neutral;
+}
+
+async function portal(req: Request, env: Env): Promise<Response> {
+  if (req.method !== "POST") return json(env, { error: "POST only" }, 405);
+  const { token } = await jsonBody<{ token: string }>(req);
+  const payload = typeof token === "string" ? await verifyLicense(token, (await signingKeys(env)).pub) : null;
+  if (!payload) return json(env, { error: "invalid license key" }, 400);
+  const row = await env.DB.prepare("select stripe_customer from licenses where id = ?").bind(payload.lid).first<{ stripe_customer: string | null }>();
+  if (!row?.stripe_customer) return json(env, { error: "unknown license" }, 404);
+  const session = await stripe<{ url: string }>(secret(env, "STRIPE_SECRET_KEY"), "POST", "/billing_portal/sessions", {
+    customer: row.stripe_customer,
+    return_url: secret(env, "SITE_URL").replace(/\/+$/, ""),
+  });
+  return json(env, { url: session.url });
+}
+
+interface CancelRow {
+  id: string;
+  plan: string;
+  stripe_subscription: string | null;
+  lang: Lang | null;
+  email: string | null;
+}
+
+/**
+ * Cancel button (§ 312k BGB): no login, identified by email (plus the license key if the subscription
+ * runs under another address). Ends every active subscription at the end of its paid period and
+ * always confirms receipt by email. Unmatched or extraordinary cancellations go to the owner.
+ */
+async function cancel(req: Request, env: Env): Promise<Response> {
+  if (req.method !== "POST") return json(env, { error: "POST only" }, 405);
+  const body = await jsonBody<{ email: string; kind: string; reason: string; key: string }>(req);
+  if (typeof body.email !== "string" || !EMAIL.test(body.email.trim())) return json(env, { error: "invalid email" }, 400);
+  const email = body.email.trim();
+  const kind = body.kind === "extraordinary" ? "extraordinary" : "ordinary";
+  const reason = typeof body.reason === "string" ? body.reason.trim().slice(0, 1000) : "";
+  const receivedAt = new Date();
+
+  const { results } = await env.DB.prepare("select id, plan, stripe_subscription, lang, email from licenses where lower(email) = lower(?) and status <> 'canceled'").bind(email).all<CancelRow>();
+  const rows = [...results];
+  const keyPayload = typeof body.key === "string" && body.key.trim() ? await verifyLicense(body.key, (await signingKeys(env)).pub) : null;
+  if (keyPayload && !rows.some((r) => r.id === keyPayload.lid)) {
+    const byKey = await env.DB.prepare("select id, plan, stripe_subscription, lang, email from licenses where id = ? and status <> 'canceled'").bind(keyPayload.lid).first<CancelRow>();
+    if (byKey) rows.push(byKey);
+  }
+
+  const contracts: CancelledContract[] = [];
+  const failures: string[] = [];
+  for (const r of rows) {
+    if (!r.stripe_subscription) continue;
+    try {
+      const sub = await stripe<Subscription>(secret(env, "STRIPE_SECRET_KEY"), "POST", `/subscriptions/${r.stripe_subscription}`, { cancel_at_period_end: true });
+      contracts.push({ plan: r.plan, endsAt: periodEnd(sub) });
+    } catch (err) {
+      failures.push(`${r.stripe_subscription}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  const previous = await env.DB.prepare("select received_at from cancellations where lower(email) = lower(?) order by received_at desc limit 1").bind(email).first<{ received_at: string }>();
+  await env.DB.prepare("insert into cancellations (received_at, email, kind, reason, matched) values (?, ?, ?, ?, ?)")
+    .bind(receivedAt.toISOString(), email, kind, reason || null, contracts.length)
+    .run();
+
+  const lang: Lang = rows[0]?.lang ?? (req.headers.get("accept-language")?.toLowerCase().startsWith("de") ? "de" : "en");
+  try {
+    // The confirmation goes to the address that was entered, so the real customer always learns about it.
+    if (!recent(previous?.received_at, receivedAt.getTime()) || contracts.length) await sendEmail(mailEnv(env), cancellationMail(lang, email, receivedAt, kind, contracts, reason || undefined));
+    if (env.OWNER_EMAIL && (!contracts.length || kind === "extraordinary" || failures.length)) {
+      const text = `Cancellation received ${receivedAt.toISOString()}\nEmail: ${email}\nType: ${kind}\nReason: ${reason || "-"}\nEnded at period end: ${contracts.map((c) => `${c.plan} until ${c.endsAt}`).join(", ") || "none"}\nStripe errors: ${failures.join("; ") || "none"}`;
+      await sendEmail(mailEnv(env), ownerMail(env.OWNER_EMAIL, contracts.length ? `Cancellation (${kind})` : "Cancellation without matching subscription", text));
+    }
+  } catch (err) {
+    console.error("cancellation mail failed", err);
+  }
+  return json(env, { ok: true, receivedAt: receivedAt.toISOString(), kind, contracts });
+}
+
 const ROUTES: Record<string, (req: Request, env: Env) => Promise<Response>> = {
   "/checkout": checkout,
   "/stripe-webhook": stripeWebhook,
   "/license": license,
   "/license-refresh": licenseRefresh,
+  "/license/resend": licenseResend,
+  "/portal": portal,
+  "/cancel": cancel,
   "/telemetry": telemetry,
   "/health": health,
 };

@@ -1,4 +1,4 @@
-import { dailySummaryOnce } from "./report.js";
+import { dailySummaryOnce, trialNoticeOnce } from "./report.js";
 import { saveCodexRateLimits } from "./handoff.js";
 import { checkInventory } from "./scanner/inventory.js";
 import { evaluateBudget } from "./budget.js";
@@ -86,6 +86,10 @@ export function setTodayOverride(on) {
 /** Yesterday's one-line summary, at most once per day. */
 export function dailySummary(cfg, lang) {
     return withLock(() => dailySummaryOnce(cfg, lang));
+}
+/** The trial-end notice, at most twice per install. */
+export function trialNotice(lang) {
+    return withLock(() => trialNoticeOnce(lang));
 }
 /** Scan new or changed extensions and count the results for the report. */
 export function checkExtensions(cwd, scanner) {

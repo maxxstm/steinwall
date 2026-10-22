@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manage your SteinWall Pro license</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="style.css">
+<script src="config.js"></script>
+</head>
+<body>
+<header><a href="./">SteinWall</a></header>
+<main>
+  <h1>Manage your license</h1>
+  <p class="lead">Change your payment method, download invoices or update your billing details in the Stripe customer portal.</p>
+  <form class="stack" id="form">
+    <label>License key <input name="token" required placeholder="SW1...." autocomplete="off" spellcheck="false"></label>
+    <p><button type="submit">Open customer portal</button></p>
+  </form>
+  <p class="note" id="status"></p>
+  <div class="box">
+    <p>In the terminal: <code>node ~/.steinwall/bin/steinwall.mjs license manage</code> prints the same link.</p>
+    <p>Lost your key? <a href="license.html">Have it emailed to you</a>. Want to cancel? <a href="kuendigen.html">Verträge hier kündigen</a>.</p>
+  </div>
+</main>
+<footer><a href="manage.html">Lizenz verwalten</a><a href="kuendigen.html">Verträge hier kündigen</a><a href="impressum.html">Impressum</a><a href="datenschutz.html">Datenschutz</a><a href="agb.html">AGB</a></footer>
+<script>
+(() => {
+  const cfg = window.STEINWALL || {};
+  const form = document.getElementById("form");
+  const status = document.getElementById("status");
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    form.querySelector("button").disabled = true;
+    status.textContent = "Opening the portal…";
+    const r = await fetch(cfg.apiUrl + "/portal", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: form.token.value.trim() }) }).catch(() => null);
+    if (r && r.ok) {
+      location.href = (await r.json()).url;
+      return;
+    }
+    status.textContent = r && r.status === 400 ? "This license key is not valid. Please copy it again from your email." : "That did not work. Please try again later.";
+    form.querySelector("button").disabled = false;
+  };
+})();
+</script>
+</body>
+</html>

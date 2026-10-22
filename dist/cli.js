@@ -22,7 +22,7 @@ import { runBackground } from "./adapters/claude-code/background.js";
 import { runMcpServer } from "./mcp/server.js";
 import { openFile, writeDashboard } from "./core/dashboard.js";
 import { writeCard } from "./core/card.js";
-import { activateLicense, deactivateLicense, proStatus, refreshLicense } from "./core/license.js";
+import { activateLicense, deactivateLicense, portalUrl, proStatus, refreshLicense } from "./core/license.js";
 const de = (lang, deText, enText) => (lang === "de" ? deText : enText);
 function version() {
     return readJson(join(pluginRoot(), "package.json"), {}).version ?? "?";
@@ -53,6 +53,12 @@ async function licenseAsync(args, cfg, lang) {
         const r = await refreshLicense(cfg.license.apiUrl);
         if (!args.includes("--quiet"))
             console.log(r);
+        return 0;
+    }
+    if (sub === "manage") {
+        const url = await portalUrl(cfg.license.apiUrl);
+        console.log(de(lang, `Kundenportal (Zahlungsmittel, Rechnungen): ${url}`, `Customer portal (payment method, invoices): ${url}`));
+        console.log(de(lang, "Kündigen: https://steinwall.dev/kuendigen.html", "Cancel: https://steinwall.dev/kuendigen.html"));
         return 0;
     }
     if (sub === "deactivate") {
@@ -267,7 +273,7 @@ const HELP = `steinwall - guardian for coding agents. Spend less. Break nothing.
                                  (exit code 2 if something should not be installed)
   budget [options]               --daily <USD|off> --monthly <USD|off> --plan <api|subscription|auto>
                                  --enforce-subscription <on|off>, override (lift today's stop), resume
-  license [activate <key>|refresh|deactivate]   Pro license and trial status
+  license [activate <key>|manage|refresh|deactivate]   Pro license and trial status
   telemetry on|off               anonymous contribution to the public savings counter (opt-in)
   dashboard [--days N] [--no-open]   Pro: local dashboard with history
   card [--month] [--no-open]     shareable savings card (PNG download)

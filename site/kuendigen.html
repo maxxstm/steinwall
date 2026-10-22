@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verträge hier kündigen – SteinWall</title>
+<link rel="stylesheet" href="style.css">
+<script src="config.js"></script>
+</head>
+<body>
+<header><a href="./">SteinWall</a></header>
+<main>
+  <h1>Verträge hier kündigen</h1>
+  <p class="lead">Kündige dein SteinWall-Pro-Abo ohne Anmeldung. Du bekommst sofort eine Bestätigung per E-Mail. <span class="note">(Cancel your SteinWall Pro subscription without logging in. You get a confirmation by email right away.)</span></p>
+
+  <form class="stack" id="form">
+    <fieldset>
+      <legend>Art der Kündigung</legend>
+      <label><input type="radio" name="kind" value="ordinary" checked> Ordentliche Kündigung</label>
+      <label><input type="radio" name="kind" value="extraordinary"> Außerordentliche Kündigung</label>
+    </fieldset>
+    <label id="reason-label" hidden>Grund der außerordentlichen Kündigung <textarea name="reason" rows="3" maxlength="1000"></textarea></label>
+    <label>E-Mail-Adresse, mit der du gekauft hast (für die Bestätigung) <input type="email" name="email" required autocomplete="email"></label>
+    <label>Lizenzschlüssel (optional, falls du mit einer anderen Adresse gekauft hast) <input name="key" placeholder="SW1...." autocomplete="off" spellcheck="false"></label>
+    <label>Kündigungszeitpunkt
+      <select name="when" disabled><option>Zum nächstmöglichen Zeitpunkt (Ende des bezahlten Zeitraums)</option></select>
+    </label>
+    <p><button type="submit">Jetzt kündigen</button></p>
+  </form>
+
+  <div id="done" class="box" hidden>
+    <h2>Deine Kündigung ist eingegangen</h2>
+    <p id="done-text"></p>
+    <ul id="done-list"></ul>
+    <p class="note">Speichere oder drucke diese Seite als Nachweis. Die Bestätigung haben wir dir außerdem per E-Mail geschickt.</p>
+  </div>
+  <p class="note" id="status"></p>
+</main>
+<footer><a href="manage.html">Lizenz verwalten</a><a href="kuendigen.html">Verträge hier kündigen</a><a href="impressum.html">Impressum</a><a href="datenschutz.html">Datenschutz</a><a href="agb.html">AGB</a></footer>
+<script>
+(() => {
+  const cfg = window.STEINWALL || {};
+  const form = document.getElementById("form");
+  const status = document.getElementById("status");
+  const reason = document.getElementById("reason-label");
+  form.querySelectorAll("input[name=kind]").forEach((r) => (r.onchange = () => (reason.hidden = form.kind.value !== "extraordinary")));
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    form.querySelector("button").disabled = true;
+    status.textContent = "Wird gesendet…";
+    const body = { email: form.email.value, kind: form.kind.value, reason: form.reason.value, key: form.key.value.trim() };
+    const r = await fetch(cfg.apiUrl + "/cancel", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
+    if (!r || !r.ok) {
+      status.textContent = r && r.status === 400 ? "Bitte prüfe die E-Mail-Adresse." : "Das hat nicht geklappt. Bitte versuche es gleich noch einmal oder schreibe an hello@steinwall.dev.";
+      form.querySelector("button").disabled = false;
+      return;
+    }
+    const d = await r.json();
+    const at = new Date(d.receivedAt).toLocaleString("de-DE", { timeZone: "Europe/Berlin", dateStyle: "long", timeStyle: "short" });
+    document.getElementById("done-text").textContent = `Eingang: ${at} (Europe/Berlin) · ${body.email} · ${d.kind === "ordinary" ? "ordentliche Kündigung zum nächstmöglichen Zeitpunkt" : "außerordentliche Kündigung"}`;
+    const list = document.getElementById("done-list");
+    if (d.contracts.length) {
+      for (const c of d.contracts) {
+        const li = document.createElement("li");
+        li.textContent = `SteinWall Pro (${c.plan}) endet zum ${new Date(c.endsAt).toLocaleDateString("de-DE", { dateStyle: "long" })}. Bis dahin bleibt Pro aktiv, es wird nichts mehr abgebucht.`;
+        list.appendChild(li);
+      }
+    } else {
+      const li = document.createElement("li");
+      li.textContent = "Zu dieser Adresse haben wir kein aktives Abo gefunden. Wir prüfen deine Kündigung von Hand und melden uns per E-Mail.";
+      list.appendChild(li);
+    }
+    form.hidden = true;
+    status.textContent = "";
+    document.getElementById("done").hidden = false;
+  };
+})();
+</script>
+</body>
+</html>

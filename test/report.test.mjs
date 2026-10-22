@@ -126,3 +126,20 @@ test("the daily summary shows once per day", () => {
   assert.match(dailySummaryOnce(api, "en", now), /SteinWall yesterday/);
   assert.equal(dailySummaryOnce(api, "en", now), null);
 });
+
+test("trial end: one notice on the last day, one after it, with measured Pro savings; never for license holders", async () => {
+  const { trialNoticeOnce } = await import("../dist/core/report.js");
+  const { updateDay } = await import("../dist/core/usage.js");
+  const now = new Date();
+  const trial = (days) => ({ pro: true, reason: "trial", trialDaysLeft: days });
+  assert.equal(trialNoticeOnce("en", now, { pro: true, reason: "license", trialDaysLeft: 0 }), null);
+  assert.equal(trialNoticeOnce("en", now, trial(2)), null);
+  assert.equal(trialNoticeOnce("en", now, trial(1)), "SteinWall Pro: your trial ends tomorrow. Keep Pro: steinwall license");
+  assert.equal(trialNoticeOnce("en", now, trial(1)), null, "only once");
+  updateDay(localDay(now), (d) => {
+    d.savings.bySource = { ...(d.savings.bySource ?? {}), routing: 1.5 };
+  });
+  const ended = trialNoticeOnce("de", now, { pro: false, reason: "none", trialDaysLeft: 0 });
+  assert.match(ended, /Testphase ist vorbei\. Pro hat darin ≈ 1,50 \$ zusätzlich gespart\..*bleiben kostenlos\. Pro: 9 \$\/Monat/);
+  assert.equal(trialNoticeOnce("de", now, { pro: false, reason: "none", trialDaysLeft: 0 }), null, "only once");
+});
