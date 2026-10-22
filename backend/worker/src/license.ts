@@ -44,9 +44,10 @@ export async function signLicense(payload: LicensePayload, privateKey: CryptoKey
 export async function verifyLicense(token: string, publicKey: CryptoKey): Promise<LicensePayload | null> {
   const parts = token.trim().split(".");
   if (parts.length !== 3 || parts[0] !== "SW1") return null;
-  const ok = await crypto.subtle.verify({ name: "Ed25519" }, publicKey, fromB64url(parts[2]!), enc.encode(`${parts[0]}.${parts[1]}`));
-  if (!ok) return null;
+  // A malformed key (bad base64, wrong signature length) throws in Workers' Web Crypto: treat it as invalid.
   try {
+    const ok = await crypto.subtle.verify({ name: "Ed25519" }, publicKey, fromB64url(parts[2]!), enc.encode(`${parts[0]}.${parts[1]}`));
+    if (!ok) return null;
     return JSON.parse(new TextDecoder().decode(fromB64url(parts[1]!))) as LicensePayload;
   } catch {
     return null;

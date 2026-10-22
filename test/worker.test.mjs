@@ -306,3 +306,13 @@ test("daily self-check: silent when healthy, mails the owner about errors and br
   await selfCheck(env, Date.now() + 31 * 86_400_000);
   assert.equal(env.DB.sqlite.prepare("select count(*) as n from errors").get().n, 0, "errors older than 30 days are pruned");
 });
+
+test("malformed license keys are rejected as invalid, never as a server error", async () => {
+  const env = makeEnv();
+  for (const token of ["SW1.forged.sig", "SW1.e30.%%%", "SW1..", "SW1.e30.AAAA"]) {
+    assert.equal((await handle(post("/portal", { token }), env)).status, 400, token);
+    assert.equal((await handle(post("/license-refresh", { token }), env)).status, 400, token);
+  }
+  const res = await handle(post("/cancel", { email: "x@example.test", key: "SW1.garbage.%%" }), env);
+  assert.equal(res.status, 200, "a mistyped key does not break the cancellation");
+});
