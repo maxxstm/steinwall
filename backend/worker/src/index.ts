@@ -44,6 +44,8 @@ export interface Env {
   RESEND_API_KEY: string;
   /** Where cancellations that need a human and other notices go. */
   OWNER_EMAIL?: string;
+  /** "on" once Stripe Tax is set up: automatic VAT and VAT ID collection in Checkout. */
+  STRIPE_TAX?: string;
 }
 
 const FOUNDER_LIMIT = 500;
@@ -181,6 +183,9 @@ async function checkout(req: Request, env: Env): Promise<Response> {
     client_reference_id: referral,
     metadata: { plan },
     subscription_data: { metadata: { plan } },
+    // VAT once Stripe Tax is set up in the dashboard: tax by the buyer's country, VAT ID for businesses
+    // (reverse charge). Off until then, because Checkout refuses automatic tax without a registration.
+    ...(env.STRIPE_TAX === "on" ? { automatic_tax: { enabled: true }, tax_id_collection: { enabled: true }, billing_address_collection: "auto" } : {}),
   });
   return json(env, { url: session.url });
 }

@@ -90,6 +90,13 @@ test("checkout creates a Stripe session with the plan's price and the site's ret
   assert.match(body, /success_url=https:\/\/example\.test\/license\.html\?session_id=\{CHECKOUT_SESSION_ID\}/);
   assert.match(body, /client_reference_id=SW-ABCDEFGH/);
   assert.equal((await handle(post("/checkout", { plan: "lifetime" }), env)).status, 400);
+  assert.doesNotMatch(body, /automatic_tax/, "no tax settings until Stripe Tax is set up");
+  stripeCalls.length = 0;
+  await handle(post("/checkout", { plan: "monthly" }), { ...env, STRIPE_TAX: "on" });
+  const taxed = decodeURIComponent(stripeCalls[0].body);
+  assert.ok(taxed.includes("automatic_tax[enabled]=true"));
+  assert.ok(taxed.includes("tax_id_collection[enabled]=true"));
+  assert.match(taxed, /billing_address_collection=auto/);
 });
 
 test("checkout refuses the founder price once 500 founder licenses exist", async () => {
