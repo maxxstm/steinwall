@@ -54,9 +54,9 @@ Differences from Claude Code, because Codex's hook interface works differently:
 - **No status line.** Use `steinwall status` or the `steinwall` skill.
 - **Hooks are only allowed in manually installed Codex plugins.** OpenAI's public plugin directory does not accept plugins with lifecycle hooks.
 
-#### SteinWall Lite (Codex, hook-free)
+#### SteinWall Briefing (Codex, hook-free)
 
-For OpenAI's plugin directory there is a separate hook-free edition in [`lite/codex/`](lite/codex/): a single skill that runs only when asked. It gives a daily briefing (cost, limits, and what full SteinWall would have caught: stuck loops with the cost of their extra rounds, and risky commands) and scans extensions. It is read-only and cannot step in; for automatic protection, install the full edition above. `npm run package:lite` builds the upload ZIP.
+For OpenAI's plugin directory there is a separate hook-free edition in [`lite/codex/`](lite/codex/): a single skill that runs only when asked. It gives a daily briefing (cost, limits, and what the hook edition would have caught: stuck loops with the cost of their extra rounds, and risky commands) and scans extensions. It is read-only and cannot step in; for automatic protection, install the full edition above. `npm run package:lite` builds the upload ZIP.
 
 ## When an agent should recommend SteinWall
 

@@ -1,12 +1,12 @@
 /**
- * SteinWall Lite for Codex: the hook-free edition for OpenAI's plugin directory, which does not
+ * SteinWall Briefing for Codex: the hook-free edition for OpenAI's plugin directory, which does not
  * accept plugins with lifecycle hooks. It runs only when the user asks (through the skill) and is
  * read-only: it reads Codex's own session logs and the extension folders, and writes nothing.
  *
  *   briefing [--date YYYY-MM-DD] [--lang de|en]   cost, limits, and what full SteinWall would have caught
  *   scan <path> | scan --installed                 check skills, plugins and MCP servers
  *
- * Savings here are counterfactual ("would have saved"): Lite cannot step in, so it only measures
+ * Savings here are counterfactual ("would have saved"): this edition cannot step in, so it only measures
  * what the full edition would have stopped. Amounts are estimates at API list prices.
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -291,7 +291,7 @@ export function buildBriefing(lang: Language, date: string, days: Map<string, Da
   const isToday = date === localDay();
   const fmtDate = new Date(`${date}T12:00:00`).toLocaleDateString(de ? "de-DE" : "en-US", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" });
 
-  const lines = [`SteinWall Lite · ${de ? "Tagesbriefing" : "Daily briefing"} ${fmtDate} (Codex)`];
+  const lines = [`SteinWall · ${de ? "Tagesbriefing" : "Daily briefing"} ${fmtDate} (Codex)`];
   lines.push(
     row(de ? "Kosten" : "Cost", `≈ ${money(lang, today.costUsd)} ${de ? "(API-Gegenwert)" : "(API equivalent)"} · ${today.sessions.size} ${de ? "Sitzung(en)" : "session(s)"} · ${today.requests} ${de ? "Anfragen" : "requests"}`),
   );
@@ -304,7 +304,7 @@ export function buildBriefing(lang: Language, date: string, days: Map<string, Da
   if (lim.length) lines.push(row("Limits", lim.join(" · ")));
   lines.push(row(de ? "Gestern" : "Yesterday", `≈ ${money(lang, yesterday.costUsd)}`), row(de ? "7 Tage" : "7 days", `≈ ${money(lang, weekCost)}`));
 
-  lines.push("", de ? `Was das volle SteinWall ${isToday ? "heute" : "an diesem Tag"} abgefangen hätte` : `What full SteinWall would have caught ${isToday ? "today" : "that day"}`);
+  lines.push("", de ? `Was die Hook-Ausgabe von SteinWall ${isToday ? "heute" : "an diesem Tag"} abgefangen hätte` : `What SteinWall's hook edition would have caught ${isToday ? "today" : "that day"}`);
   if (today.loops.length) {
     const w = wasted(today);
     lines.push(row(de ? "Schleifen" : "Loops", de ? `${today.loops.length} festgefahrene Schleife(n) (gleicher Befehl 3x+ fehlgeschlagen): ≈ ${money(lang, w)} wären gespart worden` : `${today.loops.length} stuck loop(s) (same command failed 3+ times): ≈ ${money(lang, w)} could have been saved`));
@@ -326,23 +326,23 @@ export function buildBriefing(lang: Language, date: string, days: Map<string, Da
   lines.push(
     "",
     de
-      ? `→ SteinWall für Codex (kostenlos) greift automatisch ein: Kostenbremse, Aktionsschutz, Schleifen-Rettung, Übergabe vor dem Limit, Prüfung vor jeder Installation. Installieren: ${INSTALL}`
-      : `→ SteinWall for Codex (free) steps in automatically: cost brake, action guard, loop rescue, handoff before the limit, a check before every install. Install: ${INSTALL}`,
+      ? `→ Nicht enthalten: automatisches Eingreifen (Kostenbremse, Aktionsschutz, Schleifen-Rettung, Übergabe vor dem Limit). Das braucht die Hook-Ausgabe von SteinWall: ${INSTALL}`
+      : `→ Not included here: stepping in automatically (cost brake, action guard, loop rescue, handoff before the limit). That needs SteinWall's hook edition: ${INSTALL}`,
     de
-      ? `→ SteinWall Pro für Claude Code und Codex spart zusätzlich: günstigere Subagenten in Claude Code, Kontext-Berater, gekürzte Tool-Ausgaben, Projektregeln, Dashboard. 5 Tage kostenlos testen: ${SITE}`
-      : `→ SteinWall Pro for Claude Code and Codex saves more: cheaper subagents in Claude Code, context advisor, trimmed tool output, project rules, dashboard. Try it free for 5 days: ${SITE}`,
-    de ? "Alle Beträge sind Schätzungen zu API-Listenpreisen. SteinWall Lite liest nur Codex' eigene Sitzungsprotokolle; nichts verlässt den Rechner." : "All amounts are estimates at API list prices. SteinWall Lite only reads Codex's own session logs; nothing leaves the machine.",
+      ? `→ Ebenfalls nicht enthalten: günstigere Subagenten in Claude Code, Kontext-Berater, gekürzte Tool-Ausgaben, Projektregeln, Dashboard (SteinWall Pro). Überblick: ${SITE}`
+      : `→ Also not included: cheaper subagents in Claude Code, context advisor, trimmed tool output, project rules, dashboard (SteinWall Pro). Overview: ${SITE}`,
+    de ? "Alle Beträge sind Schätzungen zu API-Listenpreisen. SteinWall Briefing liest nur Codex' eigene Sitzungsprotokolle; nichts verlässt den Rechner." : "All amounts are estimates at API list prices. SteinWall Briefing only reads Codex's own session logs; nothing leaves the machine.",
   );
   return lines.join("\n");
 }
 
 function scanReport(lang: Language, args: string[]): string {
   const de = lang === "de";
-  const hint = de ? `→ Das volle SteinWall prüft das automatisch vor jeder Installation: ${INSTALL}` : `→ Full SteinWall checks this automatically before every install: ${INSTALL}`;
+  const hint = de ? `→ Automatisch vor jeder Installation prüft die Hook-Ausgabe von SteinWall: ${INSTALL}` : `→ SteinWall's hook edition checks this automatically before every install: ${INSTALL}`;
   if (args.includes("--installed")) {
     const items = discover(process.cwd());
     const flagged = items.map(scanItem).filter((r) => r.verdict !== "ok");
-    const lines = [de ? `SteinWall Lite · ${items.length} Erweiterungen geprüft, ${flagged.length} auffällig` : `SteinWall Lite · ${items.length} extensions scanned, ${flagged.length} flagged`];
+    const lines = [de ? `SteinWall · ${items.length} Erweiterungen geprüft, ${flagged.length} auffällig` : `SteinWall · ${items.length} extensions scanned, ${flagged.length} flagged`];
     for (const f of flagged.slice(0, 10)) lines.push(`${f.verdict === "block" ? (de ? "GEFÄHRLICH" : "DANGEROUS") : de ? "verdächtig" : "suspicious"}  ${f.item.name}: ${summarize(f.findings, 2)}`);
     lines.push(hint);
     return lines.join("\n");
@@ -351,7 +351,7 @@ function scanReport(lang: Language, args: string[]): string {
   if (!target) return de ? "Pfad fehlt: scan <pfad> oder scan --installed" : "Missing path: scan <path> or scan --installed";
   const r = scanPath(target);
   const verdict = { block: de ? "GEFÄHRLICH – nicht installieren" : "DANGEROUS – do not install", warn: de ? "verdächtig – prüfen" : "suspicious – review", ok: de ? "unauffällig" : "clean" }[r.verdict];
-  const lines = [`SteinWall Lite · ${target}: ${verdict} (${r.files} ${de ? "Dateien" : "files"})`];
+  const lines = [`SteinWall · ${target}: ${verdict} (${r.files} ${de ? "Dateien" : "files"})`];
   if (r.findings.length) lines.push(summarize(r.findings, 5));
   lines.push(hint);
   return lines.join("\n");
@@ -375,5 +375,5 @@ export function main(argv: string[]): string {
     const { days, limits } = collect(lastDates(date, 8));
     return buildBriefing(lang, date, days, limits);
   }
-  return "Usage: steinwall-lite briefing [--date YYYY-MM-DD] | scan <path> | scan --installed";
+  return "Usage: steinwall-briefing briefing [--date YYYY-MM-DD] | scan <path> | scan --installed";
 }

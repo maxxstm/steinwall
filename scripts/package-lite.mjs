@@ -1,11 +1,11 @@
-// Packs lite/codex into lite/steinwall-lite-codex.zip for upload to OpenAI's plugin directory.
+// Packs lite/codex into lite/steinwall-briefing-codex.zip for upload to OpenAI's plugin directory.
 // A stored (uncompressed) ZIP written by hand, so packaging needs no extra dependency. Run after
 // `npm run build`, which bundles the Lite script into the skill folder.
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const root = "lite/codex";
-const out = "lite/steinwall-lite-codex.zip";
+const out = "lite/steinwall-briefing-codex.zip";
 
 const files = [];
 (function walk(dir) {
@@ -15,8 +15,8 @@ const files = [];
     else files.push({ name: relative(root, path).split("\\").join("/"), data: readFileSync(path) });
   }
 })(root);
-if (!files.some((f) => f.name === "skills/steinwall-lite/scripts/steinwall-lite.mjs")) throw new Error("Lite script missing: run npm run build first");
-if (files.some((f) => f.name.startsWith("hooks/") || f.name === ".app.json")) throw new Error("Lite must not contain hooks or app references");
+if (!files.some((f) => f.name === "skills/steinwall-briefing/scripts/steinwall-briefing.mjs")) throw new Error("Briefing script missing: run npm run build first");
+if (files.some((f) => f.name.startsWith("hooks/") || f.name === ".app.json")) throw new Error("The directory edition must not contain hooks or app references");
 
 const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
   let c = n;

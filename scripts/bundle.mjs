@@ -14,10 +14,10 @@ await build({
   logLevel: "warning",
 });
 
-// SteinWall Lite for Codex: one self-contained script inside the skill folder of the hook-free plugin.
+// SteinWall Briefing for Codex: one self-contained script inside the skill folder of the hook-free plugin.
 await build({
-  entryPoints: { "steinwall-lite": "src/bin/codex-lite.ts" },
-  outdir: "lite/codex/skills/steinwall-lite/scripts",
+  entryPoints: { "steinwall-briefing": "src/bin/codex-lite.ts" },
+  outdir: "lite/codex/skills/steinwall-briefing/scripts",
   outExtension: { ".js": ".mjs" },
   bundle: true,
   platform: "node",

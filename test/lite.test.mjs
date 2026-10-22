@@ -1,4 +1,4 @@
-// SteinWall Lite for Codex: reading rollout logs, counterfactual savings, and the briefing text.
+// SteinWall Briefing for Codex: reading rollout logs, counterfactual savings, and the briefing text.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
@@ -55,7 +55,7 @@ test("a rollout yields cost, limits, a stuck loop with its extra rounds, and ris
   assert.deepEqual(d.risky.map((r) => r.rule), ["force-push"]);
 });
 
-test("the briefing shows what full SteinWall would have saved, then the free and Pro hints", () => {
+test("the briefing shows what the hook edition would have saved, then neutral notes on what is not included", () => {
   const days = new Map();
   const limits = { at: 0, value: {} };
   readRollout(rollout(), "s1", days, limits);
@@ -65,14 +65,16 @@ test("the briefing shows what full SteinWall would have saved, then the free and
   assert.match(en, /1 stuck loop\(s\) \(same command failed 3\+ times\): ≈ \$\d+\.\d\d could have been saved/);
   assert.match(en, /4x {2}npm test/);
   assert.match(en, /force push.*git push --force origin main/i);
-  assert.match(en, /→ SteinWall for Codex \(free\).*codex plugin marketplace add maxxstm\/steinwall/);
-  assert.match(en, /→ SteinWall Pro for Claude Code and Codex saves more: .*steinwall\.dev/);
+  assert.match(en, /→ Not included here: stepping in automatically .*codex plugin marketplace add maxxstm\/steinwall/);
+  assert.match(en, /→ Also not included: cheaper subagents in Claude Code.*\(SteinWall Pro\)\. Overview: https:\/\/steinwall\.dev/);
+  // OpenAI's directory rules: no prices, trials, offers or upgrade pitches.
+  assert.doesNotMatch(en, /free|trial|\$\d+\/month|buy|upgrade|discount/i);
   const de = buildBriefing("de", DAY, days, limits.value);
   assert.match(de, /Tagesbriefing/);
   assert.match(de, /wären gespart worden/);
   const quiet = buildBriefing("en", DAY, new Map(), {});
   assert.match(quiet, /Nothing: no stuck loops, no risky commands\./);
-  assert.match(quiet, /→ SteinWall Pro/);
+  assert.match(quiet, /\(SteinWall Pro\)/);
 });
 
 test("collect reads rollouts from CODEX_HOME/sessions/YYYY/MM/DD and the CLI prints the briefing", () => {
