@@ -1,6 +1,6 @@
 {
   "name": "steinwall-briefing",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Daily cost briefing for Codex: what today cost at API list prices, how much of the 5-hour and weekly limits is used, and which stuck loops and risky commands an automatic guard would have caught. Also scans skills, plugins and MCP servers for malicious patterns before you install them. Read-only, runs locally.",
   "author": {
     "name": "Maximilian Steinmetz",
@@ -8,7 +8,17 @@
   },
   "homepage": "https://steinwall.dev",
   "repository": "https://github.com/maxxstm/steinwall",
-  "keywords": ["cost", "budget", "usage", "limits", "security", "scanner", "mcp", "report"],
+  "license": "FSL-1.1-MIT",
+  "keywords": [
+    "cost",
+    "budget",
+    "usage",
+    "limits",
+    "security",
+    "scanner",
+    "mcp",
+    "report"
+  ],
   "skills": "./skills/",
   "interface": {
     "displayName": "SteinWall Briefing",

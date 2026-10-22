@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+
+- **License:** SteinWall is now available under the [Functional Source License 1.1, MIT Future License](LICENSE) (`FSL-1.1-MIT`): use, change and share it for anything except a competing product; each version becomes MIT two years after its release.
+- Malformed license keys are rejected as invalid instead of causing a server error.
+
 ## 0.1.0 – first public release
 
 SteinWall runs next to Claude Code and Codex on your machine. Spend less. Break nothing.

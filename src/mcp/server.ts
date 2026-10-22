@@ -65,7 +65,7 @@ export function handle(req: Request, cfg: Config, lang: Language): unknown | nul
   const reply = (result: unknown) => ({ jsonrpc: "2.0", id: req.id, result });
   switch (req.method) {
     case "initialize":
-      return reply({ protocolVersion: req.params?.protocolVersion ?? PROTOCOL, capabilities: { tools: {} }, serverInfo: { name: "steinwall", version: "0.1.0" } });
+      return reply({ protocolVersion: req.params?.protocolVersion ?? PROTOCOL, capabilities: { tools: {} }, serverInfo: { name: "steinwall", version: "0.1.1" } });
     case "ping":
       return reply({});
     case "tools/list":

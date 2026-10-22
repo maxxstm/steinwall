@@ -1,9 +1,9 @@
 {
   "name": "steinwall",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Guardian for coding agents (Claude Code, Codex): cost brake, action guard, loop rescue, limit handoff. Spend less. Break nothing.",
   "type": "module",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "FSL-1.1-MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/maxxstm/steinwall.git"

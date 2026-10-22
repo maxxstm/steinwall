@@ -179,3 +179,7 @@ Development: `npm install`, `npm test`.
 - The scanner is rule-based (`src/core/scanner/rules.ts`). Each rule has a severity per context: Markdown the agent reads, code that runs, or config. The rules were calibrated against the 400+ files of the official plugins bundled with the Claude desktop app, and all of them come out clean. A finding is an indicator, not proof, and "OK" is no guarantee. Known-bad packages are listed in `src/core/scanner/signatures.ts`, each with its source; entries in `~/.steinwall/signatures.json` are merged on top.
 - Limit data (`rate_limits`) only reaches the status line, so the proactive handoff needs the SteinWall status line installed. Without it, only the fallback after a limit hit applies.
 - Hook latency is dominated by Node startup. SteinWall's own work is about 10–15 ms per call.
+
+## License
+
+[Functional Source License 1.1, MIT Future License](LICENSE) (`FSL-1.1-MIT`). You may use, copy, modify and redistribute SteinWall for any purpose except offering a competing product or service. Two years after each version is released, that version becomes available under the MIT license.

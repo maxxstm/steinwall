@@ -1,6 +1,6 @@
 {
   "name": "steinwall",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Guardian for coding agents: cost brake, blocks or stops risky actions (recursive delete, force push, secrets, curl|sh), rescues stuck loops, hands work over before usage limits, scans skills/plugins/MCP servers before install. Spend less. Break nothing.",
   "author": {
     "name": "Maximilian Steinmetz",
@@ -8,6 +8,7 @@
   },
   "homepage": "https://github.com/maxxstm/steinwall",
   "repository": "https://github.com/maxxstm/steinwall",
+  "license": "FSL-1.1-MIT",
   "keywords": [
     "cost",
     "budget",
