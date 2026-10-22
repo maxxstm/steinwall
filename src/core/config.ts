@@ -89,7 +89,7 @@ export const DEFAULT_CONFIG: Config = {
   plan: "auto",
   budget: { dailyUsd: 25, monthlyUsd: 300, warnAt: 0.8, enforceOnSubscription: false },
   loop: { enabled: true, hintAfter: 3, escalateAfter: 5, notifyUserAfter: 8, repeatHintAfter: 6 },
-  license: { apiUrl: "https://steinwall-api.unilevelup.workers.dev" },
+  license: { apiUrl: "https://api.steinwall.dev" },
   telemetry: { enabled: false, asked: false },
   pro: { routing: true, contextAdvisor: true, contextWarnTokens: 150_000, outputTrim: true, outputTrimChars: 30_000, costCoach: false },
   scanner: { enabled: true, trusted: [], includeDesktopPlugins: true },

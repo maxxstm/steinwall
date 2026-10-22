@@ -7,3 +7,7 @@ workers_dev = true
 [assets]
 directory = "./site"
 not_found_handling = "404-page"
+
+[[routes]]
+pattern = "steinwall.dev"
+custom_domain = true
