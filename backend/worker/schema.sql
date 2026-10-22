@@ -47,3 +47,11 @@ create table if not exists cancellations (
   reason text,
   matched integer not null default 0          -- subscriptions ended at period end
 );
+
+-- Internal errors of the last 30 days, for the daily self-check (route and message only, no request data).
+create table if not exists errors (
+  id integer primary key autoincrement,
+  at text not null,
+  route text not null,
+  message text not null
+);

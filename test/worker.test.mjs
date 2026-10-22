@@ -5,7 +5,7 @@ import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 
-const { handle } = await import("../backend/worker/src/index.ts");
+const { handle, selfCheck } = await import("../backend/worker/src/index.ts");
 const { verifyLicense } = await import("../backend/worker/src/license.ts");
 
 const DAY = 86_400_000;
@@ -56,6 +56,7 @@ globalThis.fetch = async (url, init = {}) => {
   }
   stripeCalls.push({ url: String(url), method: init.method, body: init.body });
   if (String(url).endsWith("/billing_portal/sessions")) return Response.json({ url: "https://billing.stripe.test/p/session_1" });
+  if (String(url).includes("/prices/")) return Response.json({ id: String(url).split("/prices/")[1], active: !String(url).endsWith("price_inactive") });
   if (String(url).includes("/subscriptions/")) {
     const id = String(url).split("/subscriptions/")[1];
     return Response.json({ id, status: "active", customer: "cus_x", items: { data: [{ current_period_end: Math.floor((Date.now() + 30 * DAY) / 1000) }] } });
@@ -89,6 +90,8 @@ test("checkout creates a Stripe session with the plan's price and the site's ret
   assert.match(body, /line_items\[0\]\[price\]=price_y/);
   assert.match(body, /success_url=https:\/\/example\.test\/license\.html\?session_id=\{CHECKOUT_SESSION_ID\}/);
   assert.match(body, /client_reference_id=SW-ABCDEFGH/);
+  assert.ok(body.includes("consent_collection[terms_of_service]=required"), "the consent checkbox is required");
+  assert.ok(body.includes("I expressly request that SteinWall Pro starts immediately") && body.includes("Widerrufsrecht"), "withdrawal waiver in both languages");
   assert.equal((await handle(post("/checkout", { plan: "lifetime" }), env)).status, 400);
   assert.doesNotMatch(body, /automatic_tax/, "no tax settings until Stripe Tax is set up");
   stripeCalls.length = 0;
@@ -207,6 +210,7 @@ test("the license key is emailed once per purchase, in the buyer's language", as
   const token = /license activate (SW1\.\S+)/.exec(m.text)[1];
   assert.ok(await verifyLicense(token, pair.publicKey), "the mailed key is valid");
   assert.match(m.text, /kuendigen\.html/);
+  assert.match(m.text, /Widerrufsrecht mit diesem Beginn erloschen/, "consent confirmed on a durable medium");
   assert.ok(env.DB.sqlite.prepare("select key_emailed_at from licenses where checkout_session = 'cs_mail'").get().key_emailed_at);
 });
 
@@ -279,4 +283,26 @@ test("health names a wrong mail key", async () => {
   const env = makeEnv();
   const { problems } = await (await handle(req("/health"), { ...env, RESEND_API_KEY: "sk_test_x" })).json();
   assert.deepEqual(problems, ["RESEND_API_KEY must start with re_, but starts with sk_"]);
+});
+
+test("daily self-check: silent when healthy, mails the owner about errors and broken prices", async () => {
+  const env = makeEnv();
+  mails.length = 0;
+  assert.deepEqual(await selfCheck(env), []);
+  assert.equal(mails.length, 0, "no mail when all is well");
+
+  const res = await handle(post("/checkout", { plan: "monthly" }), { ...env, STRIPE_SECRET_KEY: "" });
+  assert.equal(res.status, 500);
+  assert.equal(env.DB.sqlite.prepare("select count(*) as n from errors").get().n, 1, "the error is kept for the self-check");
+
+  const problems = await selfCheck({ ...env, STRIPE_PRICE_YEARLY: "price_inactive" });
+  assert.equal(problems.length, 2);
+  assert.match(problems[0], /price for yearly is inactive/);
+  assert.match(problems[1], /1 error\(s\) in the last 24 hours:\n.*\/checkout: missing secret STRIPE_SECRET_KEY/);
+  assert.equal(mails.length, 1);
+  assert.deepEqual(mails[0].to, ["owner@example.test"]);
+  assert.match(mails[0].subject, /Daily self-check found problems/);
+
+  await selfCheck(env, Date.now() + 31 * 86_400_000);
+  assert.equal(env.DB.sqlite.prepare("select count(*) as n from errors").get().n, 0, "errors older than 30 days are pruned");
 });

@@ -42,18 +42,24 @@ const footer = (lang: Lang) =>
     ? `Verwalten (Zahlungsmittel, Rechnungen): ${SITE}/manage.html\nKündigen: ${SITE}/kuendigen.html\nFragen: Antworte einfach auf diese E-Mail.`
     : `Manage (payment method, invoices): ${SITE}/manage.html\nCancel: ${SITE}/kuendigen.html\nQuestions: just reply to this email.`;
 
+/** Confirmation on a durable medium of the consent given in Checkout (§ 356 (5) BGB). */
+const consentNote = (lang: Lang) =>
+  lang === "de"
+    ? `Bestätigung: Du hast beim Kauf den AGB zugestimmt und ausdrücklich verlangt, dass SteinWall Pro sofort beginnt. Dir ist bekannt, dass dein Widerrufsrecht mit diesem Beginn erloschen ist. AGB: ${SITE}/agb.html · Widerrufsbelehrung: ${SITE}/widerruf.html`
+    : `Confirmation: at checkout you agreed to the Terms and expressly requested that SteinWall Pro starts immediately. You acknowledged that your right of withdrawal ends with that start. Terms: ${SITE}/agb.html · Withdrawal policy: ${SITE}/widerruf.html`;
+
 export function licenseMail(lang: Lang, to: string, token: string, referralCode: string): Mail {
   const ref = `${SITE}/?ref=${referralCode}`;
   return lang === "de"
     ? {
         to,
         subject: "Dein SteinWall-Pro-Lizenzschlüssel",
-        text: `Danke für deinen Kauf von SteinWall Pro!\n\nAktiviere Pro in Claude Code (erste Zeile) oder in jedem Terminal, auch für Codex (zweite Zeile):\n\n${activation(token)}\n\nDein Empfehlungslink – für jeden neuen Pro-Nutzer darüber bekommst du einen Monat geschenkt:\n${ref}\n\nBewahre den Schlüssel privat auf. Er wird offline geprüft und alle paar Tage erneuert; dabei wird nur der Schlüssel selbst gesendet.\n\n${footer(lang)}`,
+        text: `Danke für deinen Kauf von SteinWall Pro!\n\n${consentNote(lang)}\n\nAktiviere Pro in Claude Code (erste Zeile) oder in jedem Terminal, auch für Codex (zweite Zeile):\n\n${activation(token)}\n\nDein Empfehlungslink – für jeden neuen Pro-Nutzer darüber bekommst du einen Monat geschenkt:\n${ref}\n\nBewahre den Schlüssel privat auf. Er wird offline geprüft und alle paar Tage erneuert; dabei wird nur der Schlüssel selbst gesendet.\n\n${footer(lang)}`,
       }
     : {
         to,
         subject: "Your SteinWall Pro license key",
-        text: `Thank you for buying SteinWall Pro!\n\nActivate Pro in Claude Code (first line) or in any terminal, also for Codex (second line):\n\n${activation(token)}\n\nYour referral link – you get one free month for every new Pro user who signs up through it:\n${ref}\n\nKeep your key private. It is checked offline and refreshed every few days, which only sends the key itself.\n\n${footer(lang)}`,
+        text: `Thank you for buying SteinWall Pro!\n\n${consentNote(lang)}\n\nActivate Pro in Claude Code (first line) or in any terminal, also for Codex (second line):\n\n${activation(token)}\n\nYour referral link – you get one free month for every new Pro user who signs up through it:\n${ref}\n\nKeep your key private. It is checked offline and refreshed every few days, which only sends the key itself.\n\n${footer(lang)}`,
       };
 }
 

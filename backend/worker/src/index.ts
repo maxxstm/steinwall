@@ -49,6 +49,14 @@ export interface Env {
 }
 
 const FOUNDER_LIMIT = 500;
+/**
+ * The required checkbox in Checkout: terms, privacy policy and the express request to start at once,
+ * with the acknowledgement that the right of withdrawal ends with that start (§ 356 (5) BGB). The
+ * license email confirms it on a durable medium.
+ */
+const CONSENT_TEXT = (site: string) =>
+  `I agree to the [Terms](${site}/agb.html) and have read the [Privacy Policy](${site}/datenschutz.html). I expressly request that SteinWall Pro starts immediately and acknowledge that I lose my [right of withdrawal](${site}/widerruf.html) once it has started. · ` +
+  `Ich stimme den [AGB](${site}/agb.html) zu und habe die [Datenschutzerklärung](${site}/datenschutz.html) gelesen. Ich verlange ausdrücklich, dass SteinWall Pro sofort beginnt, und weiß, dass ich mit Beginn mein [Widerrufsrecht](${site}/widerruf.html) verliere.`;
 const REFERRAL_BONUS_DAYS = 30;
 const GRACE_MS = 7 * 24 * 3600 * 1000;
 const PRICES = { monthly: "STRIPE_PRICE_MONTHLY", yearly: "STRIPE_PRICE_YEARLY", founder: "STRIPE_PRICE_FOUNDER" } as const;
@@ -183,6 +191,8 @@ async function checkout(req: Request, env: Env): Promise<Response> {
     client_reference_id: referral,
     metadata: { plan },
     subscription_data: { metadata: { plan } },
+    consent_collection: { terms_of_service: "required" },
+    custom_text: { terms_of_service_acceptance: { message: CONSENT_TEXT(site) } },
     // VAT once Stripe Tax is set up in the dashboard: tax by the buyer's country, VAT ID for businesses
     // (reverse charge). Off until then, because Checkout refuses automatic tax without a registration.
     ...(env.STRIPE_TAX === "on" ? { automatic_tax: { enabled: true }, tax_id_collection: { enabled: true }, billing_address_collection: "auto" } : {}),
@@ -410,10 +420,45 @@ export async function handle(req: Request, env: Env): Promise<Response> {
   try {
     return await route(req, env);
   } catch (err) {
-    // Logged for `wrangler tail`; a 500 also makes Stripe retry the webhook later.
+    // Logged for `wrangler tail` and kept for the daily self-check; a 500 also makes Stripe retry the webhook later.
     console.error(err);
+    const message = (err instanceof Error ? err.message : String(err)).slice(0, 500);
+    await env.DB.prepare("insert into errors (at, route, message) values (?, ?, ?)").bind(new Date().toISOString(), new URL(req.url).pathname, message).run().catch(() => {});
     return json(env, { error: "internal error" }, 500);
   }
 }
 
-export default { fetch: handle };
+const DAY_MS = 24 * 3600 * 1000;
+
+/**
+ * Daily self-check (cron): settings, the Stripe key and prices, and the errors of the last 24 hours.
+ * Emails the owner only when something is wrong; returns the problems found.
+ */
+export async function selfCheck(env: Env, now = Date.now()): Promise<string[]> {
+  const problems = REQUIRED.map((name) => secretProblem(name, env[name] as string | undefined)).filter((p): p is string => p !== null);
+  if (!problems.some((p) => p.startsWith("STRIPE_SECRET_KEY"))) {
+    for (const plan of Object.keys(PRICES) as (keyof typeof PRICES)[]) {
+      try {
+        const price = await stripe<{ active: boolean }>(secret(env, "STRIPE_SECRET_KEY"), "GET", `/prices/${secret(env, PRICES[plan])}`);
+        if (!price.active) problems.push(`Stripe price for ${plan} is inactive`);
+      } catch (err) {
+        problems.push(`Stripe check for ${plan} failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  }
+  const since = new Date(now - DAY_MS).toISOString();
+  const { results: errors } = await env.DB.prepare("select at, route, message from errors where at >= ? order by at desc limit 20").bind(since).all<{ at: string; route: string; message: string }>();
+  if (errors.length) problems.push(`${errors.length} error(s) in the last 24 hours:\n${errors.map((e) => `  ${e.at} ${e.route}: ${e.message}`).join("\n")}`);
+  await env.DB.prepare("delete from errors where at < ?").bind(new Date(now - 30 * DAY_MS).toISOString()).run();
+  if (problems.length && env.OWNER_EMAIL && !problems.some((p) => p.startsWith("RESEND_API_KEY"))) {
+    await sendEmail(mailEnv(env), ownerMail(env.OWNER_EMAIL, "Daily self-check found problems", `${problems.join("\n\n")}\n\nDetails: https://api.steinwall.dev/health and \`npx wrangler tail\` in backend/worker.`));
+  }
+  return problems;
+}
+
+export default {
+  fetch: handle,
+  async scheduled(_event: unknown, env: Env, ctx: { waitUntil(p: Promise<unknown>): void }) {
+    ctx.waitUntil(selfCheck(env));
+  },
+};
